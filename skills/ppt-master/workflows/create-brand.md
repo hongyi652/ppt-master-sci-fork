@@ -43,7 +43,7 @@ Read assets directly using existing converters — no dedicated extraction scrip
 | PNG/JPG logo | `Read` (multimodal); AI vision identifies dominant colors | colors (approximate HEX, label `[approx]`), logo file |
 | Brand site URL | `python3 skills/ppt-master/scripts/source_to_md/web_to_md.py <URL>`, then `Read` the result | color references, font references, voice/tone |
 | Branded PPTX | `python3 skills/ppt-master/scripts/source_to_md/ppt_to_md.py <file>`, then read theme XML | colors, typography (literal) |
-| Brand PDF | `python3 skills/ppt-master/scripts/source_to_md/pdf_to_md.py <file>` | voice/tone; sometimes color/font references |
+| Brand PDF | `python3 skills/ppt-master/scripts/source_to_md/mineru_to_md.py <file>` | voice/tone; sometimes color/font references |
 
 Identify which of (colors / typography / logo / voice / icon style) the asset did NOT cover, then proceed to Step 3 for the rest. Most single assets cover 1–2 categories well.
 

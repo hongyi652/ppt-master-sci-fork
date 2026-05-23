@@ -1,54 +1,20 @@
 # Conversion Tools
 
-> Architecture rationale (why native-Python first with pandoc fallback, why curl_cffi for TLS impersonation): see [docs/technical-design.md "Source Content Conversion"](../../../../docs/technical-design.md#source-content-conversion).
+> Architecture rationale (why MinerU is the only PDF path, why pandoc remains a fallback for some document formats, and why curl_cffi is used for TLS impersonation): see [docs/technical-design.md "Source Content Conversion"](../../../../docs/technical-design.md#source-content-conversion).
 
 Source conversion tools turn PDFs, documents, slide decks, and web pages into Markdown before project creation.
 
-## `source_to_md/pdf_to_md.py`
+## PDF parsing via `source_to_md/mineru_to_md.py`
 
-Recommended first choice for native PDFs.
+PPT Master now uses MinerU as the only supported PDF parser. The older `source_to_md/pdf_to_md.py` command remains only as a compatibility shim and exits with an error telling you to use MinerU.
 
-```bash
-python3 scripts/source_to_md/pdf_to_md.py book.pdf
-python3 scripts/source_to_md/pdf_to_md.py book.pdf -o output.md
-python3 scripts/source_to_md/pdf_to_md.py ./pdfs
-python3 scripts/source_to_md/pdf_to_md.py ./pdfs -o ./markdown
-
-# Image extraction control (default: filtered)
-python3 scripts/source_to_md/pdf_to_md.py book.pdf --images filtered  # size/quality filters applied
-python3 scripts/source_to_md/pdf_to_md.py book.pdf --images all       # extract all images, no filtering
-python3 scripts/source_to_md/pdf_to_md.py book.pdf --images none      # skip all images (text only)
-```
-
-Use cases:
-- Native PDFs exported from Word, PowerPoint, LaTeX, or similar tools
-- Privacy-sensitive documents that should stay local
-- Fast first-pass extraction before falling back to OCR-heavy tools
-
-Prefer MinerU or another OCR/layout tool when:
-- The PDF is scanned or image-based
-- Multi-column layout parsing is poor
-- Encoding is garbled
-
-Dependency:
-
-```bash
-pip install PyMuPDF
-```
-
-## `source_to_md/mineru_to_md.py`
-
-MinerU-backed parser for PDFs or other files accepted by the MinerU API. It
-normalizes MinerU's result zip into the same convention used by the native
-converters: `<output>.md` plus a sibling `<output>_files/` directory. Extracted
-images are referenced from Markdown and `image_manifest.json` is written for
-project import.
+MinerU normalizes its result zip into the project convention used throughout the repo: `<output>.md` plus a sibling `<output>_files/` directory. Extracted images are referenced from Markdown and `image_manifest.json` is written for project import.
 
 ```bash
 python3 scripts/source_to_md/mineru_to_md.py paper.pdf
 python3 scripts/source_to_md/mineru_to_md.py paper.pdf -o output.md --is-ocr
 python3 scripts/source_to_md/mineru_to_md.py mineru_result.zip --from-zip -o output.md
-python3 scripts/project_manager.py import-sources projects/demo paper.pdf --move --pdf-parser mineru
+python3 scripts/project_manager.py import-sources projects/demo paper.pdf --move
 ```
 
 Configuration:

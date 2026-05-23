@@ -3,7 +3,7 @@
 
 Usage:
     python3 scripts/project_manager.py init <project_name> [--format ppt169] [--dir projects]
-    python3 scripts/project_manager.py import-sources <project_path> <source1> [<source2> ...] [--move | --copy] [--pdf-parser local|mineru]
+    python3 scripts/project_manager.py import-sources <project_path> <source1> [<source2> ...] [--move | --copy]
     python3 scripts/project_manager.py validate <project_path>
     python3 scripts/project_manager.py info <project_path>
 """
@@ -261,14 +261,11 @@ class ProjectManager:
         self,
         pdf_path: Path,
         markdown_path: Path,
-        *,
-        pdf_parser: str = "local",
     ) -> None:
-        script_name = "mineru_to_md.py" if pdf_parser == "mineru" else "pdf_to_md.py"
         self._run_tool(
             [
                 sys.executable,
-                str(TOOLS_DIR / "source_to_md" / script_name),
+                str(TOOLS_DIR / "source_to_md" / "mineru_to_md.py"),
                 str(pdf_path),
                 "-o",
                 str(markdown_path),
@@ -558,12 +555,12 @@ class ProjectManager:
         source_items: list[str],
         move: bool = False,
         copy: bool = False,
-        pdf_parser: str = "local",
+        pdf_parser: str = "mineru",
     ) -> dict[str, list[str]]:
         if move and copy:
             raise ValueError("--move and --copy are mutually exclusive")
-        if pdf_parser not in {"local", "mineru"}:
-            raise ValueError("--pdf-parser must be either 'local' or 'mineru'")
+        if pdf_parser != "mineru":
+            raise ValueError("Native PDF parsing has been removed; only --pdf-parser mineru is supported")
         project_dir = Path(project_path)
         if not project_dir.exists() or not project_dir.is_dir():
             raise FileNotFoundError(f"Project directory not found: {project_dir}")
@@ -674,7 +671,7 @@ class ProjectManager:
                     continue
                 markdown_path = canonical_markdown_path
                 try:
-                    self._import_pdf(archived_path, markdown_path, pdf_parser=pdf_parser)
+                    self._import_pdf(archived_path, markdown_path)
                     summary["markdown"].append(str(markdown_path))
                     self._propagate_companion_image_assets(markdown_path, project_dir)
                 except Exception as exc:  # pragma: no cover - summary path
@@ -1012,7 +1009,7 @@ def parse_import_args(argv: list[str]) -> tuple[str, list[str], bool, bool, str]
     project_path = argv[2]
     move = False
     copy = False
-    pdf_parser = "local"
+    pdf_parser = "mineru"
     sources: list[str] = []
 
     i = 3
@@ -1026,7 +1023,7 @@ def parse_import_args(argv: list[str]) -> tuple[str, list[str], bool, bool, str]
             i += 1
         elif arg == "--pdf-parser":
             if i + 1 >= len(argv):
-                raise ValueError("--pdf-parser requires a value: local or mineru")
+                raise ValueError("--pdf-parser requires a value: mineru")
             pdf_parser = argv[i + 1]
             i += 2
         elif arg.startswith("--pdf-parser="):
@@ -1038,8 +1035,8 @@ def parse_import_args(argv: list[str]) -> tuple[str, list[str], bool, bool, str]
 
     if move and copy:
         raise ValueError("--move and --copy are mutually exclusive")
-    if pdf_parser not in {"local", "mineru"}:
-        raise ValueError("--pdf-parser must be either 'local' or 'mineru'")
+    if pdf_parser != "mineru":
+        raise ValueError("Native PDF parsing has been removed; only --pdf-parser mineru is supported")
     if not sources:
         raise ValueError("At least one source path or URL is required")
 

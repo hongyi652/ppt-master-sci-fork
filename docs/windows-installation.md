@@ -59,7 +59,7 @@ Wait for it to finish. You should see `Successfully installed ...` at the end.
 ## Step 4 — Verify Your Setup
 
 ```powershell
-python -c "import pptx; import fitz; print('All core dependencies OK')"
+python -c "import pptx; import requests; print('All core dependencies OK')"
 ```
 
 ✅ Output: `All core dependencies OK` → you're good.
@@ -217,11 +217,11 @@ pip install -r requirements.txt --proxy http://your-proxy:port
 
 `pip` installed to a different Python. Use `python -m pip install -r requirements.txt` to match.
 
-### `import fitz` fails
+### `requests` or MinerU-related imports fail
 
 1. Upgrade pip: `python -m pip install --upgrade pip`
-2. Pre-built wheel: `pip install PyMuPDF --only-binary :all:`
-3. Still failing → install [Visual C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+2. Reinstall dependencies: `python -m pip install -r requirements.txt`
+3. If PDF parsing still fails, check that `MINERU_API_TOKEN` is configured correctly
 
 ### PowerShell says "running scripts is disabled"
 

@@ -62,7 +62,7 @@ pip install -r requirements.txt
 ## Step 4 — 验证安装
 
 ```powershell
-python -c "import pptx; import fitz; print('All core dependencies OK')"
+python -c "import pptx; import requests; print('All core dependencies OK')"
 ```
 
 ✅ 输出 `All core dependencies OK` → 核心环境没问题。
@@ -136,11 +136,11 @@ pip install -r requirements.txt --proxy http://your-proxy:port
 
 `pip` 装到了另一个 Python 环境。用 `python -m pip install -r requirements.txt` 确保对应同一个。
 
-### `import fitz` 失败
+### `requests` 或 MinerU 相关导入失败
 
 1. 升级 pip：`python -m pip install --upgrade pip`
-2. 预编译包：`pip install PyMuPDF --only-binary :all:`
-3. 仍失败 → 安装 [Visual C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+2. 重新安装依赖：`python -m pip install -r requirements.txt`
+3. 如果 PDF 解析仍失败，检查 `MINERU_API_TOKEN` 是否配置正确
 
 ### PowerShell「脚本运行被禁用」
 

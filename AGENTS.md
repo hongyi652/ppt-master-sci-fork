@@ -50,7 +50,7 @@ Convenience summary only — full workflow in [`skills/ppt-master/SKILL.md`](ski
 
 ```bash
 # Source content conversion
-python3 skills/ppt-master/scripts/source_to_md/pdf_to_md.py <PDF_file>
+python3 skills/ppt-master/scripts/source_to_md/mineru_to_md.py <PDF_file>
 python3 skills/ppt-master/scripts/source_to_md/doc_to_md.py <DOCX_or_other_file>
 python3 skills/ppt-master/scripts/source_to_md/excel_to_md.py <XLSX_or_XLSM_file>
 python3 skills/ppt-master/scripts/source_to_md/ppt_to_md.py <PPTX_file>

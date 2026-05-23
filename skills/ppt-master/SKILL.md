@@ -51,8 +51,7 @@ On this machine, run Python commands as `py -3.11` instead of `python3`, and set
 
 | Script | Purpose |
 |--------|---------|
-| `${SKILL_DIR}/scripts/source_to_md/pdf_to_md.py` | PDF to Markdown |
-| `${SKILL_DIR}/scripts/source_to_md/mineru_to_md.py` | MinerU file/PDF parsing to Markdown + image assets |
+| `${SKILL_DIR}/scripts/source_to_md/mineru_to_md.py` | PDF/file parsing to Markdown + image assets via MinerU |
 | `${SKILL_DIR}/scripts/source_to_md/doc_to_md.py` | Documents to Markdown — native Python for DOCX/HTML/EPUB/IPYNB, pandoc fallback for legacy formats (.doc/.odt/.rtf/.tex/.rst/.org/.typ) |
 | `${SKILL_DIR}/scripts/source_to_md/excel_to_md.py` | Excel workbooks to Markdown — supports .xlsx/.xlsm; legacy .xls should be resaved as .xlsx |
 | `${SKILL_DIR}/scripts/source_to_md/ppt_to_md.py` | PowerPoint to Markdown |
@@ -106,8 +105,7 @@ When the user provides non-Markdown content, convert immediately:
 
 | User Provides | Command |
 |---------------|---------|
-| PDF file | `python3 ${SKILL_DIR}/scripts/source_to_md/pdf_to_md.py <file>` |
-| PDF file requiring MinerU layout/OCR parsing | `python3 ${SKILL_DIR}/scripts/source_to_md/mineru_to_md.py <file>` |
+| PDF file | `python3 ${SKILL_DIR}/scripts/source_to_md/mineru_to_md.py <file>` |
 | DOCX / Word / Office document | `python3 ${SKILL_DIR}/scripts/source_to_md/doc_to_md.py <file>` |
 | XLSX / XLSM / Excel workbook | `python3 ${SKILL_DIR}/scripts/source_to_md/excel_to_md.py <file>` |
 | CSV / TSV | Read directly as plain-text table source |
@@ -173,7 +171,6 @@ Import source content (choose based on the situation):
 | Situation | Action |
 |-----------|--------|
 | Has source files (PDF/MD/etc.) | `python3 ${SKILL_DIR}/scripts/project_manager.py import-sources <project_path> <source_files...> --move` |
-| Has PDF sources that should be parsed through MinerU during import | `python3 ${SKILL_DIR}/scripts/project_manager.py import-sources <project_path> <pdf_files...> --move --pdf-parser mineru` |
 | User provided text directly in conversation | No import needed — content is already in conversation context; subsequent steps can reference it directly |
 
 > ⚠️ **MUST use `--move`** (not copy): all source files — Step 1's generated Markdown, original PDFs / MDs / images — go into `sources/` via `import-sources --move`. After execution they no longer exist at the original location. Intermediate artifacts (e.g., `_files/`) are handled automatically.

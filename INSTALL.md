@@ -73,10 +73,9 @@ pip install -r requirements.txt
 | 包名 | 用途 |
 |------|------|
 | `python-pptx` | SVG → PPTX 转换 |
-| `PyMuPDF (fitz)` | PDF 解析 |
+| `requests` | HTTP 请求 / MinerU 接口调用 |
 | `Pillow` | 图片处理 |
 | `numpy` | 图片数值计算 |
-| `requests` | HTTP 请求 |
 | `beautifulsoup4` | HTML 解析 |
 | `flask` | Web UI 服务 |
 | `edge-tts` | 语音旁白生成 |
@@ -89,7 +88,7 @@ pip install -r requirements.txt
 验证安装成功：
 
 ```bash
-python -c "import pptx; import fitz; import flask; print('All OK')"
+python -c "import pptx; import flask; import requests; print('All OK')"
 ```
 
 ---
@@ -269,8 +268,8 @@ try:
 except: print('python-pptx: ✗ (pip install python-pptx)')
 
 try:
-    import fitz; print(f'PyMuPDF: {fitz.version_bind} ✓')
-except: print('PyMuPDF: ✗ (pip install PyMuPDF)')
+    import requests; print(f'requests: {requests.__version__} ✓')
+except: print('requests: ✗ (pip install requests)')
 
 try:
     import flask; print(f'Flask: {flask.__version__} ✓')

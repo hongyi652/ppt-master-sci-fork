@@ -423,7 +423,7 @@ def _run_script(
 def _detect_converter(filename: str) -> Path | None:
     suffix = Path(filename).suffix.lower()
     if suffix == ".pdf":
-        return SCRIPTS_DIR / "source_to_md" / "pdf_to_md.py"
+        return SCRIPTS_DIR / "source_to_md" / "mineru_to_md.py"
     if suffix in {".docx", ".doc", ".odt", ".rtf", ".epub", ".html", ".htm", ".tex", ".rst"}:
         return SCRIPTS_DIR / "source_to_md" / "doc_to_md.py"
     if suffix in {".xlsx", ".xlsm", ".xls"}:
@@ -739,9 +739,8 @@ def _convert_pdf_with_mineru(upload_path: Path, original_name: str) -> tuple[Pat
 def _convert_uploaded_file(
     upload_path: Path,
     original_name: str,
-    parser_mode: str = "local",
 ) -> tuple[Path, dict[str, object]]:
-    if Path(original_name).suffix.lower() == ".pdf" and parser_mode == "mineru":
+    if Path(original_name).suffix.lower() == ".pdf":
         known_paths = {path.resolve() for path in upload_path.parent.glob("*.md")}
         result = _run_script(
             SCRIPTS_DIR / "source_to_md" / "mineru_to_md.py",
@@ -3238,19 +3237,16 @@ def upload_file():
 
     project_name = request.form.get("project_name", "").strip() or Path(uploaded_file.filename).stem
     canvas_format = request.form.get("canvas_format", "ppt169").strip() or "ppt169"
-    pdf_parser = request.form.get("pdf_parser", "mineru").strip().lower() or "mineru"
-    if pdf_parser not in {"local", "mineru"}:
-        pdf_parser = "mineru"
     source_parser = None
     if Path(uploaded_file.filename).suffix.lower() == ".pdf":
-        source_parser = "MinerU 云解析" if pdf_parser == "mineru" else "本地 PDF 转换"
+        source_parser = "MinerU 云解析"
 
     safe_filename = f"{uuid.uuid4().hex[:8]}_{Path(uploaded_file.filename).name}"
     upload_path = UPLOAD_DIR / safe_filename
     uploaded_file.save(str(upload_path))
 
     steps: list[dict[str, object]] = []
-    converted_path, convert_result = _convert_uploaded_file(upload_path, uploaded_file.filename, pdf_parser)
+    converted_path, convert_result = _convert_uploaded_file(upload_path, uploaded_file.filename)
     steps.append({
         "step": "转换素材",
         "success": convert_result["returncode"] == 0,
@@ -3335,12 +3331,9 @@ def upload_file_stream():
 
     project_name = request.form.get("project_name", "").strip() or Path(uploaded_file.filename).stem
     canvas_format = request.form.get("canvas_format", "ppt169").strip() or "ppt169"
-    pdf_parser = request.form.get("pdf_parser", "mineru").strip().lower() or "mineru"
-    if pdf_parser not in {"local", "mineru"}:
-        pdf_parser = "mineru"
     source_parser = None
     if Path(uploaded_file.filename).suffix.lower() == ".pdf":
-        source_parser = "MinerU 云解析" if pdf_parser == "mineru" else "本地 PDF 转换"
+        source_parser = "MinerU 云解析"
 
     safe_filename = f"{uuid.uuid4().hex[:8]}_{Path(uploaded_file.filename).name}"
     upload_path = UPLOAD_DIR / safe_filename
@@ -3350,7 +3343,7 @@ def upload_file_stream():
     def generate() -> Any:
         steps: list[dict[str, object]] = []
 
-        converted_path, convert_result = _convert_uploaded_file(upload_path, uploaded_file.filename, pdf_parser)
+        converted_path, convert_result = _convert_uploaded_file(upload_path, uploaded_file.filename)
         steps.append({
             "step": "转换素材",
             "success": convert_result["returncode"] == 0,

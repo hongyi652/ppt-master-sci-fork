@@ -35,13 +35,6 @@ svglib>=1.5.0
 reportlab>=4.0.0
 
 # ─────────────────────────────────────────────────────────────
-# PDF to Markdown tool / PDF 转 Markdown 工具 (skills/ppt-master/scripts/source_to_md/pdf_to_md.py)
-# ─────────────────────────────────────────────────────────────
-# Converts PDF to Markdown with text, image, and table extraction.
-# 用于将 PDF 文件转换为 Markdown 格式，支持文本、图片、表格提取
-PyMuPDF>=1.23.0
-
-# ─────────────────────────────────────────────────────────────
 # Document to Markdown tool / 文档转 Markdown 工具 (skills/ppt-master/scripts/source_to_md/doc_to_md.py)
 # ─────────────────────────────────────────────────────────────
 # Native (pure-Python) paths — no external binary required:
