@@ -37,7 +37,6 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPTS_DIR.parent.parent.parent
 SERVER_SCRIPT = SCRIPTS_DIR / "svg_editor" / "server.py"
 LOCK_FILE_NAME = ".live_preview.lock"
-GLOBAL_LOCK_FILE = Path.home() / ".ppt-master" / "live_preview_global.lock"
 
 
 def _preview_url(port: int) -> str:
@@ -102,7 +101,7 @@ def _request_shutdown(port: int, *, timeout: float = 1.5) -> None:
 
 def _discard_unhealthy_matching_locks(project_path: Path) -> None:
     """Remove same-project locks that point to an unresponsive preview."""
-    for lock_path in (project_path / LOCK_FILE_NAME, GLOBAL_LOCK_FILE):
+    for lock_path in (project_path / LOCK_FILE_NAME,):
         lock = _read_lock(lock_path)
         if not lock or not _lock_matches_project(lock, project_path):
             continue
@@ -125,7 +124,7 @@ def _discard_unhealthy_matching_locks(project_path: Path) -> None:
 
 
 def _ready_from_lock(project_path: Path) -> dict[str, Any] | None:
-    lock_paths = (project_path / LOCK_FILE_NAME, GLOBAL_LOCK_FILE)
+    lock_paths = (project_path / LOCK_FILE_NAME,)
     for lock_path in lock_paths:
         lock = _read_lock(lock_path)
         if not lock:

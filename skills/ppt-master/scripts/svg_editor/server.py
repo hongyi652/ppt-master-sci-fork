@@ -43,7 +43,6 @@ logger = logging.getLogger('svg_editor')
 # Per-project lock file. Lives at <project_path>/.live_preview.lock and
 # matches the *.lock entry already in the repo .gitignore.
 LOCK_FILE_NAME = '.live_preview.lock'
-GLOBAL_LOCK_FILE = Path.home() / '.ppt-master' / 'live_preview_global.lock'
 
 # Local — sys.path injection for sibling module (code-style.md §3)
 _SCRIPTS_DIR = Path(__file__).resolve().parent
@@ -884,43 +883,6 @@ def main(argv: Optional[list[str]] = None) -> int:
         logger.error('%s is not a directory', svg_output)
         return 1
 
-    global_existing = _read_lock(GLOBAL_LOCK_FILE)
-    if global_existing and _process_alive(int(global_existing.get('pid', 0))):
-        existing_pid = int(global_existing.get('pid', 0))
-        existing_port = int(global_existing.get('port', args.port))
-        existing_project = str(global_existing.get('project_path') or '')
-        try:
-            same_project = Path(existing_project).resolve() == project_path
-        except OSError:
-            same_project = False
-
-        if same_project:
-            existing_url = _preview_url(existing_port)
-            logger.info(
-                'live preview already running for this project at %s (pid=%s)',
-                existing_url,
-                existing_pid,
-            )
-            if not args.no_browser:
-                webbrowser.open(existing_url)
-            return 0
-
-        logger.info(
-            'preview already running for another project (%s on port %s); switching to %s',
-            existing_project or '(unknown project)',
-            existing_port,
-            project_path,
-        )
-        _request_preview_shutdown(existing_port, 'switch-project')
-        if _wait_for_process_exit(existing_pid, timeout_seconds=6.0):
-            _release_lock(GLOBAL_LOCK_FILE)
-        else:
-            logger.warning(
-                'previous preview (pid=%s, port=%s) did not exit cleanly; falling back to a new port',
-                existing_pid,
-                existing_port,
-            )
-
     try:
         actual_port = _pick_available_port(args.port)
     except RuntimeError as exc:
@@ -953,14 +915,10 @@ def main(argv: Optional[list[str]] = None) -> int:
         if not args.no_browser:
             webbrowser.open(existing_url)
         return 0
-    existing_global = _claim_lock(GLOBAL_LOCK_FILE, payload)
-    if existing_global is not None:
-        _write_lock(GLOBAL_LOCK_FILE, payload)
     # atexit covers normal interpreter shutdown (Ctrl+C / SystemExit);
     # /api/shutdown and idle timeout call _release_lock directly before
     # os._exit since atexit handlers do not run on os._exit.
     atexit.register(_release_lock, lock_file)
-    atexit.register(_release_lock, GLOBAL_LOCK_FILE)
 
     # SIGTERM would otherwise terminate without running atexit, leaving a
     # stale lock that future launches have to recover from. Translate it
@@ -985,7 +943,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         str(project_path),
         idle_timeout=idle_timeout,
         live=args.live,
-        lock_files=(lock_file, GLOBAL_LOCK_FILE),
+        lock_files=(lock_file,),
     )
 
     url = _preview_url(args.port)

@@ -56,10 +56,15 @@ ALLOWED_EXTENSIONS = {
 TEXT_SOURCE_EXTENSIONS = {".md", ".markdown", ".txt", ".csv", ".tsv"}
 MARKDOWN_IMAGE_PATTERN = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
 ASSET_TAG_PATTERN = re.compile(r"[A-Za-z0-9_+\-]{3,}|[\u4e00-\u9fff]{2,}")
+FIGURE_CAPTION_PATTERN = re.compile(r"^\s*((?:figure|fig\.?|图)\s*[A-Za-z]?\d+(?:\.\d+)?[A-Za-z]?)\s*[:：.\-、]?\s*(.+)?$", re.I)
 SUPPORTED_IMAGE_EXTENSIONS = {
     ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tif", ".tiff", ".webp", ".wmf", ".emf",
 }
 FORMULA_MANIFEST_FILENAME = "formula_manifest.json"
+FORMULA_RENDER_REPORT_JSON = "formula_render_report.json"
+FORMULA_RENDER_REPORT_MD = "formula_render_report.md"
+ASSET_MATCH_REPORT_JSON = "asset_match_diagnostics.json"
+ASSET_MATCH_REPORT_MD = "asset_match_diagnostics.md"
 MINERU_DEFAULT_BASE_URL = "https://mineru.net/api/v4"
 MINERU_TERMINAL_STATES = {"done", "failed"}
 MINERU_POLL_INTERVAL_SECONDS = 2.0
@@ -99,6 +104,7 @@ _LATEX_TO_SVG_MODULE = _load_script_module(
 )
 process_formula_manifest = _LATEX_TO_SVG_MODULE.process_manifest
 load_formula_manifest_entries = _LATEX_TO_SVG_MODULE.load_manifest
+save_formula_manifest_entries = _LATEX_TO_SVG_MODULE.save_manifest
 
 TOOL_ACTIONS = [
     {
@@ -387,6 +393,8 @@ def _run_script(
             cmd,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             cwd=str(resolved_cwd),
             env=env,
             timeout=timeout,
@@ -538,6 +546,18 @@ def _archive_gui_sources(project_path: Path, source_paths: list[Path]) -> dict[s
                 summary["notes"].append(
                     f"{archived_path.name}: copied {copied} image asset(s) to images/"
                 )
+
+    formula_sync = _sync_project_formula_assets(project_path)
+    if formula_sync.get("total"):
+        summary["notes"].append(
+            "公式同步："
+            f"共 {formula_sync.get('total', 0)} 条，"
+            f"成功 {formula_sync.get('rendered', 0)} 条，"
+            f"失败 {formula_sync.get('failed', 0)} 条，"
+            f"待渲染 {formula_sync.get('pending', 0)} 条。"
+        )
+    elif formula_sync.get("removed"):
+        summary["notes"].append("公式同步：当前项目未检测到 LaTeX 公式，已清理旧公式产物。")
 
     return summary
 
@@ -1001,6 +1021,13 @@ def _preview_base_url(url: str) -> str:
     return url.rstrip("/")
 
 
+def _fetch_preview_json(base_url: str, endpoint: str) -> dict[str, Any]:
+    response = requests.get(f"{base_url.rstrip('/')}/{endpoint.lstrip('/')}", timeout=3)
+    response.raise_for_status()
+    payload = response.json()
+    return payload if isinstance(payload, dict) else {}
+
+
 def _start_live_preview(project_path: Path, extra_args: list[str]) -> dict[str, Any]:
     existing = _preview_record(project_path.name, project_path)
     if existing is not None:
@@ -1462,24 +1489,107 @@ def _clean_context_line(text: str) -> str:
     return cleaned.strip()
 
 
+def _extract_heading_context(content: str, start: int, max_items: int = 2) -> list[str]:
+    headings: list[str] = []
+    for line in reversed(content[:start].splitlines()):
+        match = re.match(r"^(#{1,6})\s+(.+)$", line.strip())
+        if not match:
+            continue
+        heading = _clean_context_line(match.group(2))
+        if not heading or heading in headings:
+            continue
+        headings.append(heading)
+        if len(headings) >= max_items:
+            break
+    headings.reverse()
+    return headings
+
+
+def _normalize_figure_ref_key(raw_label: str) -> str:
+    cleaned = str(raw_label or "").strip()
+    if not cleaned:
+        return ""
+    cleaned = re.sub(r"(?i)\bfigure\b|\bfig\.?\b|图", "", cleaned)
+    cleaned = re.sub(r"[^A-Za-z0-9.]+", "", cleaned).lower()
+    if not cleaned:
+        return ""
+    return f"fig{cleaned}"
+
+
+def _extract_figure_metadata(content: str, start: int, end: int, alt: str) -> dict[str, str]:
+    before_lines = content[:start].splitlines()
+    after_lines = content[end:].splitlines()
+    headings = _extract_heading_context(content, start)
+    nearby_lines: list[str] = []
+
+    for line in after_lines[:4]:
+        cleaned = _clean_context_line(line)
+        if cleaned:
+            nearby_lines.append(cleaned)
+    for line in reversed(before_lines[-2:]):
+        cleaned = _clean_context_line(line)
+        if cleaned:
+            nearby_lines.append(cleaned)
+
+    figure_label = ""
+    figure_caption = ""
+    for candidate in nearby_lines:
+        match = FIGURE_CAPTION_PATTERN.match(candidate)
+        if not match:
+            continue
+        figure_label = match.group(1).strip()
+        figure_caption = str(match.group(2) or "").strip()
+        break
+
+    if not figure_label and alt:
+        alt_match = FIGURE_CAPTION_PATTERN.match(alt)
+        if alt_match:
+            figure_label = alt_match.group(1).strip()
+            figure_caption = str(alt_match.group(2) or "").strip()
+
+    if not figure_caption and alt:
+        figure_caption = alt.strip()[:180]
+
+    section_heading = headings[-1] if headings else ""
+    section_heading_path = " > ".join(headings)
+    return {
+        "figure_label": figure_label,
+        "figure_ref_key": _normalize_figure_ref_key(figure_label),
+        "figure_caption": figure_caption,
+        "section_heading": section_heading,
+        "section_heading_path": section_heading_path,
+    }
+
+
 def _extract_image_context(content: str, start: int, end: int) -> str:
     before_lines = content[:start].splitlines()
     after_lines = content[end:].splitlines()
-    context_parts: list[str] = []
+    context_parts: list[str] = list(_extract_heading_context(content, start))
 
     for line in reversed(before_lines):
+        if re.match(r"^(#{1,6})\s+", line.strip()):
+            continue
         cleaned = _clean_context_line(line)
         if cleaned:
             context_parts.append(cleaned)
             break
 
     for line in after_lines:
+        if re.match(r"^(#{1,6})\s+", line.strip()):
+            continue
         cleaned = _clean_context_line(line)
         if cleaned:
             context_parts.append(cleaned)
             break
 
-    return " | ".join(context_parts[:2])[:180]
+    merged: list[str] = []
+    seen: set[str] = set()
+    for part in context_parts:
+        if not part or part in seen:
+            continue
+        seen.add(part)
+        merged.append(part)
+    return " | ".join(merged[:3])[:180]
 
 
 def _extract_asset_tags(*parts: str) -> list[str]:
@@ -1787,6 +1897,8 @@ def _collect_project_image_assets(project_path: Path, source_assets: list[dict[s
             "original_filename": str(manifest_item.get("original_filename") or "") if manifest_item else "",
             "usage_count": manifest_item.get("usage_count") if manifest_item else None,
             "source_namespace": str(manifest_item.get("source_namespace") or "") if manifest_item else "",
+            "candidate_material": bool(manifest_item.get("candidate_material", False)) if manifest_item else False,
+            "selected_for_deck": bool(manifest_item.get("selected_for_deck", False)) if manifest_item else False,
             "provider": str(source_item.get("provider") or "") if source_item else "",
             "purpose": str(source_item.get("purpose") or "") if source_item else "",
             "search_query": str(source_item.get("search_query") or "") if source_item else "",
@@ -1808,6 +1920,675 @@ def _collect_project_image_assets(project_path: Path, source_assets: list[dict[s
             extra=extra,
             tag_parts=tag_parts,
         )
+
+
+def _safe_mtime(path: Path) -> float:
+    try:
+        return path.stat().st_mtime
+    except OSError:
+        return 0.0
+
+
+def _formula_report_paths(project_path: Path) -> tuple[Path, Path]:
+    notes_dir = project_path / "notes"
+    return notes_dir / FORMULA_RENDER_REPORT_JSON, notes_dir / FORMULA_RENDER_REPORT_MD
+
+
+def _relative_project_path(project_path: Path, target_path: Path | None) -> str:
+    if target_path is None:
+        return ""
+    try:
+        return target_path.resolve().relative_to(project_path.resolve()).as_posix()
+    except (OSError, ValueError):
+        return ""
+
+
+def _project_file_url(project_name: str, relative_path: str) -> str:
+    normalized = relative_path.replace("\\", "/").lstrip("/")
+    if not normalized:
+        return ""
+    return f"/api/projects/{quote(project_name)}/files/{quote(normalized, safe='/')}"
+
+
+def _asset_family(asset_type: str) -> str:
+    return "formula" if str(asset_type or "").strip().lower() == "formula" else "image"
+
+
+def _normalize_asset_status(raw_status: str, *, asset_family: str, has_file: bool) -> str:
+    status = str(raw_status or "").strip().lower()
+    if asset_family == "formula":
+        if status == "error":
+            status = "failed"
+        if status == "rendered" and not has_file:
+            return "missing"
+        if status in {"rendered", "failed", "pending", "missing"}:
+            return status
+        return "rendered" if has_file else "pending"
+    return "rendered" if has_file else "missing"
+
+
+def _coerce_string_list(value: Any) -> list[str]:
+    if isinstance(value, str):
+        cleaned = value.strip()
+        return [cleaned] if cleaned else []
+    if isinstance(value, (list, tuple, set)):
+        items: list[str] = []
+        for raw_item in value:
+            cleaned = str(raw_item or "").strip()
+            if cleaned:
+                items.append(cleaned)
+        return items
+    return []
+
+
+def _load_formula_assets(project_path: Path) -> list[dict[str, Any]]:
+    manifest_path = project_path / "images" / FORMULA_MANIFEST_FILENAME
+    if not manifest_path.is_file():
+        return []
+
+    try:
+        entries = load_formula_manifest_entries(manifest_path)
+    except Exception:
+        return []
+
+    formula_assets: list[dict[str, Any]] = []
+    for entry in entries:
+        extra = getattr(entry, "extra", {}) or {}
+        raw_context = str(getattr(entry, "context", "") or "").strip()
+        raw_latex = str(getattr(entry, "latex", "") or "").strip()
+        raw_source_file = str(extra.get("source_file") or "").strip()
+        svg_path_text = str(getattr(entry, "svg_path", "") or "").strip()
+        resolved_path = (manifest_path.parent / svg_path_text).resolve() if svg_path_text else None
+        if resolved_path is not None and not resolved_path.exists():
+            resolved_path = None
+        label = raw_context or raw_latex[:80] or f"公式 {getattr(entry, 'id', '')}"
+        tags = _coerce_string_list(extra.get("tags"))
+        if not tags:
+            tags = _extract_asset_tags(raw_latex, raw_context, raw_source_file)
+
+        extra_payload: dict[str, Any] = {
+            "latex": raw_latex,
+            "display": bool(getattr(entry, "display", True)),
+            "status": str(getattr(entry, "status", "pending") or "pending"),
+            "error": str(getattr(entry, "error", "") or "").strip(),
+            "source_kind": str(extra.get("source_kind") or "parsed_markdown"),
+            "line_number": extra.get("line_number"),
+            "candidate_material": bool(extra.get("candidate_material", False)),
+            "selected_for_deck": bool(extra.get("selected_for_deck", False)),
+            "tags": tags,
+        }
+        _append_source_asset(
+            formula_assets,
+            asset_id=f"FORM_{getattr(entry, 'id', '')}",
+            label=label,
+            asset_path=resolved_path,
+            source_file=raw_source_file,
+            reference=raw_latex,
+            context=raw_context,
+            asset_type="formula",
+            extra=extra_payload,
+            tag_parts=[*tags, raw_latex, raw_context, raw_source_file],
+        )
+    return formula_assets
+
+
+def _clear_formula_artifacts(project_path: Path) -> list[str]:
+    images_dir = project_path / "images"
+    manifest_path = images_dir / FORMULA_MANIFEST_FILENAME
+    report_json_path, report_md_path = _formula_report_paths(project_path)
+    removed: list[str] = []
+    for path in [manifest_path, report_json_path, report_md_path, *sorted(images_dir.glob("formula_*.svg"))]:
+        if not path.exists() or not path.is_file():
+            continue
+        try:
+            path.unlink()
+        except OSError:
+            continue
+        removed.append(str(path))
+    return removed
+
+
+def _project_text_sources(project_path: Path) -> list[tuple[Path, str]]:
+    sources_dir = project_path / "sources"
+    text_sources: list[tuple[Path, str]] = []
+    if not sources_dir.exists():
+        return text_sources
+
+    for source_path in sorted(sources_dir.iterdir()):
+        if not source_path.is_file() or source_path.suffix.lower() not in TEXT_SOURCE_EXTENSIONS:
+            continue
+        text_sources.append((source_path, _read_text_file(source_path)))
+    return text_sources
+
+
+def _formula_sources_from_text_sources(text_sources: list[tuple[Path, str]]) -> list[tuple[Path, str]]:
+    return [
+        (source_path, content)
+        for source_path, content in text_sources
+        if "$" in content or "\\begin{" in content
+    ]
+
+
+def _formula_assets_need_refresh(
+    project_path: Path,
+    text_sources: list[tuple[Path, str]],
+    formula_sources: list[tuple[Path, str]],
+) -> bool:
+    manifest_path = project_path / "images" / FORMULA_MANIFEST_FILENAME
+    report_json_path, report_md_path = _formula_report_paths(project_path)
+    formula_svgs = list((project_path / "images").glob("formula_*.svg"))
+    artifact_mtime = max(
+        [_safe_mtime(manifest_path), _safe_mtime(report_json_path), _safe_mtime(report_md_path), *(_safe_mtime(path) for path in formula_svgs)],
+        default=0.0,
+    )
+
+    if not formula_sources:
+        return artifact_mtime > 0
+
+    newest_source_mtime = max((_safe_mtime(source_path) for source_path, _content in text_sources), default=0.0)
+    if artifact_mtime <= 0:
+        return True
+    return newest_source_mtime > artifact_mtime
+
+
+def _sync_project_formula_assets(
+    project_path: Path,
+    *,
+    text_sources: list[tuple[Path, str]] | None = None,
+) -> dict[str, Any]:
+    resolved_text_sources = text_sources if text_sources is not None else _project_text_sources(project_path)
+    formula_sources = _formula_sources_from_text_sources(resolved_text_sources)
+    removed = _clear_formula_artifacts(project_path)
+    if not formula_sources:
+        return {
+            "total": 0,
+            "rendered": 0,
+            "failed": 0,
+            "pending": 0,
+            "missing": 0,
+            "removed": removed,
+            "updated": bool(removed),
+        }
+
+    formula_assets = _build_formula_assets(project_path, formula_sources)
+    report = _build_formula_render_report(project_path, formula_assets)
+    report_paths = _write_formula_render_report(project_path, report)
+    summary = dict(report.get("summary") or {})
+    summary.update({
+        "removed": removed,
+        "updated": True,
+        "report_paths": report_paths,
+    })
+    return summary
+
+
+def _persist_asset_planning_state(project_path: Path, source_assets: list[dict[str, Any]]) -> None:
+    formula_manifest_path = project_path / "images" / FORMULA_MANIFEST_FILENAME
+    image_manifest_path = project_path / "images" / "image_manifest.json"
+
+    formula_state_by_id: dict[str, dict[str, bool]] = {}
+    image_state_by_filename: dict[str, dict[str, bool]] = {}
+    for raw_asset in source_assets:
+        candidate_material = bool(raw_asset.get("candidate_material", False))
+        selected_for_deck = bool(raw_asset.get("selected_for_deck", False))
+        asset_type = str(raw_asset.get("asset_type") or "image").strip().lower()
+        path_text = str(raw_asset.get("path") or "").strip()
+        if asset_type == "formula":
+            asset_id = str(raw_asset.get("id") or "").strip()
+            if asset_id.startswith("FORM_"):
+                asset_id = asset_id[5:]
+            if asset_id:
+                formula_state_by_id[asset_id] = {
+                    "candidate_material": candidate_material,
+                    "selected_for_deck": selected_for_deck,
+                }
+            continue
+
+        if not path_text:
+            continue
+        asset_path = Path(path_text)
+        filename = asset_path.name
+        if filename:
+            image_state_by_filename[filename] = {
+                "candidate_material": candidate_material,
+                "selected_for_deck": selected_for_deck,
+            }
+
+    if formula_manifest_path.is_file():
+        try:
+            payload = json.loads(formula_manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            payload = None
+        if isinstance(payload, dict):
+            formulas = payload.get("formulas")
+            changed = False
+            if isinstance(formulas, list):
+                for formula in formulas:
+                    if not isinstance(formula, dict):
+                        continue
+                    state = formula_state_by_id.get(str(formula.get("id") or ""), {
+                        "candidate_material": False,
+                        "selected_for_deck": False,
+                    })
+                    for key, value in state.items():
+                        if bool(formula.get(key, False)) != value:
+                            formula[key] = value
+                            changed = True
+                if changed:
+                    formula_manifest_path.write_text(
+                        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+                        encoding="utf-8",
+                    )
+
+    image_manifest_items: list[dict[str, Any]] = []
+    if image_manifest_path.is_file():
+        try:
+            loaded = json.loads(image_manifest_path.read_text(encoding="utf-8"))
+            if isinstance(loaded, list):
+                image_manifest_items = [item for item in loaded if isinstance(item, dict)]
+        except (OSError, json.JSONDecodeError):
+            image_manifest_items = []
+
+    manifest_by_filename = {
+        str(item.get("filename") or ""): item
+        for item in image_manifest_items
+        if str(item.get("filename") or "").strip()
+    }
+    changed = False
+    for filename, state in image_state_by_filename.items():
+        item = manifest_by_filename.get(filename)
+        if item is None:
+            item = {"filename": filename}
+            image_manifest_items.append(item)
+            manifest_by_filename[filename] = item
+            changed = True
+        for key, value in state.items():
+            if bool(item.get(key, False)) != value:
+                item[key] = value
+                changed = True
+    if changed:
+        image_manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        image_manifest_path.write_text(
+            json.dumps(image_manifest_items, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+
+
+def _build_formula_render_report(project_path: Path, formula_assets: list[dict[str, Any]]) -> dict[str, Any]:
+    summary = {
+        "total": len(formula_assets),
+        "rendered": 0,
+        "failed": 0,
+        "pending": 0,
+        "missing": 0,
+    }
+    failed_items: list[dict[str, Any]] = []
+
+    for asset in formula_assets:
+        asset_path = Path(str(asset.get("path") or "")).resolve() if asset.get("path") else None
+        has_file = bool(asset_path and asset_path.exists())
+        status = _normalize_asset_status(
+            str(asset.get("status") or ""),
+            asset_family="formula",
+            has_file=has_file,
+        )
+        summary[status] += 1
+
+        error_text = str(asset.get("render_error") or asset.get("error") or "").strip()
+        if status in {"failed", "missing"}:
+            failed_items.append({
+                "id": str(asset.get("id") or ""),
+                "title": str(asset.get("alt") or ""),
+                "latex": str(asset.get("latex") or "")[:240],
+                "source_file": str(asset.get("source_file") or ""),
+                "status": status,
+                "error": error_text or ("公式 SVG 文件缺失" if status == "missing" else ""),
+            })
+
+    return {
+        "project_name": project_path.name,
+        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "summary": summary,
+        "failed_items": failed_items,
+    }
+
+
+def _render_formula_render_report_markdown(report: dict[str, Any]) -> str:
+    summary = report.get("summary") or {}
+    failed_items = list(report.get("failed_items") or [])
+    lines = [
+        "# 公式渲染报告",
+        "",
+        f"- 项目：{report.get('project_name') or ''}",
+        f"- 生成时间：{report.get('generated_at') or ''}",
+        "",
+        "## 汇总",
+        "",
+        f"- 总公式数：{summary.get('total', 0)}",
+        f"- 渲染成功：{summary.get('rendered', 0)}",
+        f"- 渲染失败：{summary.get('failed', 0)}",
+        f"- 等待渲染：{summary.get('pending', 0)}",
+        f"- 结果缺失：{summary.get('missing', 0)}",
+        "",
+        "## 失败清单",
+        "",
+    ]
+    if not failed_items:
+        lines.append("- 当前没有失败项。")
+        return "\n".join(lines)
+
+    for item in failed_items:
+        lines.append(f"### {item.get('id') or '未命名公式'}")
+        if item.get("title"):
+            lines.append(f"- 标题：{item['title']}")
+        if item.get("source_file"):
+            lines.append(f"- 来源文件：{item['source_file']}")
+        if item.get("status"):
+            lines.append(f"- 状态：{item['status']}")
+        if item.get("latex"):
+            lines.append(f"- LaTeX：`{item['latex']}`")
+        lines.append(f"- 错误：{item.get('error') or '未知错误'}")
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def _write_formula_render_report(project_path: Path, report: dict[str, Any]) -> dict[str, str]:
+    summary = report.get("summary") or {}
+    if int(summary.get("total") or 0) <= 0:
+        return {}
+
+    json_path, markdown_path = _formula_report_paths(project_path)
+    json_path.parent.mkdir(parents=True, exist_ok=True)
+    json_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    markdown_path.write_text(_render_formula_render_report_markdown(report), encoding="utf-8")
+
+    return {
+        "json": json_path.relative_to(project_path).as_posix(),
+        "markdown": markdown_path.relative_to(project_path).as_posix(),
+    }
+
+
+def _count_project_image_assets(project_path: Path) -> tuple[int, float]:
+    images_dir = project_path / "images"
+    if not images_dir.exists():
+        return 0, 0.0
+
+    count = 0
+    last_refresh_ts = _safe_mtime(images_dir)
+    supported_suffixes = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff", ".svg", ".emf", ".wmf"}
+    ignored_names = {
+        FORMULA_MANIFEST_FILENAME,
+        FORMULA_RENDER_REPORT_JSON,
+        FORMULA_RENDER_REPORT_MD,
+        "image_manifest.json",
+        "image_sources.json",
+        "image_prompts.json",
+    }
+    for asset_path in images_dir.rglob("*"):
+        if not asset_path.is_file():
+            continue
+        if any(part == ".cache" for part in asset_path.parts):
+            continue
+        last_refresh_ts = max(last_refresh_ts, _safe_mtime(asset_path))
+        if asset_path.name in ignored_names:
+            continue
+        if asset_path.suffix.lower() not in supported_suffixes:
+            continue
+        if asset_path.name.startswith("formula_"):
+            continue
+        count += 1
+    return count, last_refresh_ts
+
+
+def _formula_asset_summary(project_path: Path) -> dict[str, Any]:
+    manifest_path = project_path / "images" / FORMULA_MANIFEST_FILENAME
+    summary = {
+        "total": 0,
+        "rendered": 0,
+        "failed": 0,
+        "pending": 0,
+        "missing": 0,
+        "candidate_material": 0,
+        "selected_for_deck": 0,
+    }
+    last_refresh_ts = _safe_mtime(manifest_path)
+    if not manifest_path.is_file():
+        return {"summary": summary, "last_refresh_ts": last_refresh_ts}
+
+    try:
+        entries = load_formula_manifest_entries(manifest_path)
+    except Exception:
+        return {"summary": summary, "last_refresh_ts": last_refresh_ts}
+
+    for entry in entries:
+        extra = getattr(entry, "extra", {}) or {}
+        svg_path_text = str(getattr(entry, "svg_path", "") or "").strip()
+        resolved_path = (manifest_path.parent / svg_path_text).resolve() if svg_path_text else None
+        has_file = bool(resolved_path and resolved_path.exists())
+        status = _normalize_asset_status(
+            str(getattr(entry, "status", "") or ""),
+            asset_family="formula",
+            has_file=has_file,
+        )
+        summary["total"] += 1
+        summary[status] += 1
+        if bool(extra.get("candidate_material", False)):
+            summary["candidate_material"] += 1
+        if bool(extra.get("selected_for_deck", False)):
+            summary["selected_for_deck"] += 1
+        if has_file and resolved_path is not None:
+            last_refresh_ts = max(last_refresh_ts, _safe_mtime(resolved_path))
+
+    report_json_path, report_md_path = _formula_report_paths(project_path)
+    last_refresh_ts = max(last_refresh_ts, _safe_mtime(report_json_path), _safe_mtime(report_md_path))
+    return {"summary": summary, "last_refresh_ts": last_refresh_ts}
+
+
+def _project_asset_summary(project_path: Path) -> dict[str, Any]:
+    image_count, image_refresh_ts = _count_project_image_assets(project_path)
+    image_manifest_items = _load_asset_manifest_items(project_path / "images" / "image_manifest.json")
+    image_candidate_count = sum(1 for item in image_manifest_items if bool(item.get("candidate_material", False)))
+    image_selected_count = sum(1 for item in image_manifest_items if bool(item.get("selected_for_deck", False)))
+    formula_summary_payload = _formula_asset_summary(project_path)
+    formula_summary = dict(formula_summary_payload.get("summary") or {})
+    formula_candidate_count = int(formula_summary.get("candidate_material") or 0)
+    formula_selected_count = int(formula_summary.get("selected_for_deck") or 0)
+    report_json_path, report_md_path = _formula_report_paths(project_path)
+    last_refresh_ts = max(
+        image_refresh_ts,
+        float(formula_summary_payload.get("last_refresh_ts") or 0.0),
+        _safe_mtime(report_json_path),
+        _safe_mtime(report_md_path),
+    )
+    return {
+        "asset_count": image_count + int(formula_summary.get("total") or 0),
+        "image_count": image_count,
+        "formula_count": int(formula_summary.get("total") or 0),
+        "formula_rendered_count": int(formula_summary.get("rendered") or 0),
+        "formula_failed_count": int(formula_summary.get("failed") or 0),
+        "formula_pending_count": int(formula_summary.get("pending") or 0),
+        "formula_missing_count": int(formula_summary.get("missing") or 0),
+        "image_candidate_count": image_candidate_count,
+        "image_selected_count": image_selected_count,
+        "formula_candidate_count": formula_candidate_count,
+        "formula_selected_count": formula_selected_count,
+        "candidate_material_count": image_candidate_count + formula_candidate_count,
+        "selected_for_deck_count": image_selected_count + formula_selected_count,
+        "report_ready": report_json_path.is_file() and report_md_path.is_file(),
+        "last_asset_refresh_at": _format_timestamp(last_refresh_ts),
+        "last_asset_refresh_ts": last_refresh_ts,
+    }
+
+
+def _serialize_project_asset(project_path: Path, raw_asset: dict[str, Any]) -> dict[str, Any]:
+    path_text = str(raw_asset.get("path") or "").strip()
+    asset_path = Path(path_text) if path_text else None
+    if asset_path is not None and not asset_path.exists():
+        asset_path = None
+    relative_path = _relative_project_path(project_path, asset_path)
+    has_file = bool(relative_path and asset_path is not None and asset_path.exists())
+    asset_type = str(raw_asset.get("asset_type") or "image") or "image"
+    asset_family = _asset_family(asset_type)
+    status = _normalize_asset_status(
+        str(raw_asset.get("status") or ""),
+        asset_family=asset_family,
+        has_file=has_file,
+    )
+    tags = _merge_asset_tag_lists(_coerce_string_list(raw_asset.get("tags")))
+    title = str(raw_asset.get("alt") or raw_asset.get("id") or "未命名素材").strip()[:120]
+    description = _merge_asset_text(
+        str(raw_asset.get("figure_caption") or ""),
+        str(raw_asset.get("source_title") or ""),
+        str(raw_asset.get("context") or ""),
+        max_length=240,
+    )
+    preview_url = _project_file_url(project_path.name, relative_path) if has_file else ""
+    return {
+        "id": str(raw_asset.get("id") or ""),
+        "asset_type": asset_type,
+        "asset_family": asset_family,
+        "status": status,
+        "title": title,
+        "description": description,
+        "source_file": str(raw_asset.get("source_file") or ""),
+        "source_kind": str(raw_asset.get("source_kind") or ""),
+        "original_filename": str(raw_asset.get("original_filename") or ""),
+        "relative_path": relative_path,
+        "preview_url": preview_url,
+        "thumbnail_url": preview_url,
+        "download_url": preview_url,
+        "tags": tags,
+        "context": str(raw_asset.get("context") or ""),
+        "reference": str(raw_asset.get("reference") or ""),
+        "figure_label": str(raw_asset.get("figure_label") or ""),
+        "figure_caption": str(raw_asset.get("figure_caption") or ""),
+        "section_heading": str(raw_asset.get("section_heading") or ""),
+        "width": raw_asset.get("width"),
+        "height": raw_asset.get("height"),
+        "orientation": str(raw_asset.get("orientation") or ""),
+        "latex": str(raw_asset.get("latex") or ""),
+        "display": raw_asset.get("display"),
+        "error": str(raw_asset.get("render_error") or raw_asset.get("error") or ""),
+        "candidate_material": bool(raw_asset.get("candidate_material", False)),
+        "selected_for_deck": bool(raw_asset.get("selected_for_deck", False)),
+        "provider": str(raw_asset.get("provider") or ""),
+        "purpose": str(raw_asset.get("purpose") or ""),
+        "search_query": str(raw_asset.get("search_query") or ""),
+        "source_page_url": str(raw_asset.get("source_page_url") or ""),
+        "line_number": raw_asset.get("line_number"),
+        "report_anchor": str(raw_asset.get("id") or ""),
+    }
+
+
+def _filter_project_assets(
+    items: list[dict[str, Any]],
+    *,
+    asset_type: str,
+    status: str,
+    keyword: str,
+    source_file: str,
+) -> list[dict[str, Any]]:
+    normalized_type = asset_type.strip().lower()
+    normalized_status = status.strip().lower()
+    normalized_keyword = keyword.strip().lower()
+    normalized_source_file = source_file.strip().lower()
+
+    filtered: list[dict[str, Any]] = []
+    for item in items:
+        if normalized_type and normalized_type != "all" and str(item.get("asset_family") or "") != normalized_type:
+            continue
+        if normalized_status and normalized_status != "all" and str(item.get("status") or "") != normalized_status:
+            continue
+        if normalized_source_file and str(item.get("source_file") or "").strip().lower() != normalized_source_file:
+            continue
+        if normalized_keyword:
+            haystack = " ".join([
+                str(item.get("title") or ""),
+                str(item.get("description") or ""),
+                str(item.get("source_file") or ""),
+                str(item.get("context") or ""),
+                str(item.get("latex") or ""),
+                str(item.get("reference") or ""),
+                str(item.get("section_heading") or ""),
+                " ".join(item.get("tags") or []),
+            ]).lower()
+            if normalized_keyword not in haystack:
+                continue
+        filtered.append(item)
+    return filtered
+
+
+def _project_assets_payload(
+    project_path: Path,
+    *,
+    asset_type: str = "all",
+    status: str = "all",
+    keyword: str = "",
+    source_file: str = "",
+    limit: int = 0,
+    offset: int = 0,
+) -> dict[str, Any]:
+    image_assets: list[dict[str, Any]] = []
+    _collect_project_image_assets(project_path, image_assets)
+    formula_assets = _load_formula_assets(project_path)
+    formula_report = _build_formula_render_report(project_path, formula_assets)
+    report_paths = _write_formula_render_report(project_path, formula_report)
+
+    items = [_serialize_project_asset(project_path, asset) for asset in [*image_assets, *formula_assets]]
+    items.sort(key=lambda item: (item.get("asset_family") != "formula", item.get("source_file") or "", item.get("id") or ""))
+    filtered_items = _filter_project_assets(
+        items,
+        asset_type=asset_type,
+        status=status,
+        keyword=keyword,
+        source_file=source_file,
+    )
+    total_items = len(filtered_items)
+    if offset > 0:
+        filtered_items = filtered_items[offset:]
+    if limit > 0:
+        filtered_items = filtered_items[:limit]
+
+    filters = {
+        "source_files": sorted({str(item.get("source_file") or "") for item in items if str(item.get("source_file") or "").strip()}),
+        "tags": sorted({tag for item in items for tag in (item.get("tags") or [])})[:40],
+        "statuses": sorted({str(item.get("status") or "") for item in items if str(item.get("status") or "").strip()}),
+        "types": sorted({str(item.get("asset_family") or "") for item in items if str(item.get("asset_family") or "").strip()}),
+    }
+    summary = {
+        **_project_asset_summary(project_path),
+        "formula_rendered_count": int((formula_report.get("summary") or {}).get("rendered") or 0),
+        "formula_failed_count": int((formula_report.get("summary") or {}).get("failed") or 0),
+        "formula_pending_count": int((formula_report.get("summary") or {}).get("pending") or 0),
+        "formula_missing_count": int((formula_report.get("summary") or {}).get("missing") or 0),
+        "report_ready": bool(report_paths),
+    }
+
+    reports: dict[str, str] = {}
+    if report_paths.get("json"):
+        reports["formula_render_report_json"] = _project_file_url(project_path.name, report_paths["json"])
+    if report_paths.get("markdown"):
+        reports["formula_render_report_md"] = _project_file_url(project_path.name, report_paths["markdown"])
+
+    return {
+        "success": True,
+        "project_name": project_path.name,
+        "summary": summary,
+        "reports": reports,
+        "formula_report": formula_report,
+        "filters": filters,
+        "query": {
+            "type": asset_type,
+            "status": status,
+            "q": keyword,
+            "source_file": source_file,
+            "limit": limit,
+            "offset": offset,
+        },
+        "total_items": total_items,
+        "returned_items": len(filtered_items),
+        "items": filtered_items,
+    }
 
 
 def _image_extension_from_content_type(content_type: str) -> str:
@@ -1875,9 +2656,20 @@ def _extract_markdown_images(project_path: Path, markdown_path: Path, content: s
         resolved = _resolve_markdown_image(markdown_path, raw_target, project_path)
 
         alt = re.sub(r"\s+", " ", match.group(1)).strip()
-        label = alt or Path(urlparse(_normalize_markdown_target(raw_target)).path).name or "source image"
+        figure_meta = _extract_figure_metadata(content, match.start(), match.end(), alt)
+        label = (
+            alt
+            or str(figure_meta.get("figure_caption") or "").strip()
+            or Path(urlparse(_normalize_markdown_target(raw_target)).path).name
+            or "source image"
+        )
         image_id = f"IMG_{len(source_images) + 1:03d}"
-        context = _extract_image_context(content, match.start(), match.end())
+        context = _merge_asset_text(
+            _extract_image_context(content, match.start(), match.end()),
+            figure_meta.get("figure_caption") or "",
+            figure_meta.get("section_heading_path") or "",
+            max_length=240,
+        )
 
         if resolved is not None and resolved.exists():
             _append_source_asset(
@@ -1889,6 +2681,18 @@ def _extract_markdown_images(project_path: Path, markdown_path: Path, content: s
                 reference=_normalize_markdown_target(raw_target),
                 context=context,
                 asset_type=_infer_asset_type(label, context, resolved),
+                extra={
+                    "source_kind": "markdown_asset",
+                    **{key: value for key, value in figure_meta.items() if value},
+                },
+                tag_parts=[
+                    alt,
+                    figure_meta.get("figure_label") or "",
+                    figure_meta.get("figure_ref_key") or "",
+                    figure_meta.get("figure_caption") or "",
+                    figure_meta.get("section_heading") or "",
+                    figure_meta.get("section_heading_path") or "",
+                ],
             )
             return f"[Source Image {image_id}: {label}]"
 
@@ -1920,11 +2724,13 @@ def _build_formula_assets(project_path: Path, formula_sources: list[tuple[Path, 
         formula["id"] = f"{index:03d}_{short_hash}"
         formula["render"] = True
         formula["status"] = "pending"
-        formula["tags"] = _extract_asset_tags(
+        formula["tags"] = formula.get("tags") or _extract_asset_tags(
             str(formula.get("latex") or ""),
             str(formula.get("context") or ""),
             str(formula.get("source_file") or ""),
         )
+        formula["candidate_material"] = bool(formula.get("candidate_material", False))
+        formula["selected_for_deck"] = bool(formula.get("selected_for_deck", False))
 
     manifest_path = project_path / "images" / FORMULA_MANIFEST_FILENAME
     save_formula_manifest(manifest, manifest_path)
@@ -1933,7 +2739,18 @@ def _build_formula_assets(project_path: Path, formula_sources: list[tuple[Path, 
     try:
         process_formula_manifest(manifest_path)
     except Exception as exc:
-        render_error = str(exc)
+        render_error = str(exc).strip() or "Formula rendering failed."
+        try:
+            entries = load_formula_manifest_entries(manifest_path)
+            for entry in entries:
+                if str(getattr(entry, "status", "pending") or "pending").strip().lower() == "rendered":
+                    continue
+                entry.status = "failed"
+                if not str(getattr(entry, "error", "") or "").strip():
+                    entry.error = render_error
+            save_formula_manifest_entries(manifest_path, entries)
+        except Exception:
+            pass
 
     formula_assets: list[dict[str, Any]] = []
     try:
@@ -1979,20 +2796,22 @@ def _read_source_bundle(project_path: Path) -> dict[str, object]:
     sources_dir = project_path / "sources"
     parts: list[str] = []
     source_images: list[dict[str, Any]] = []
-    formula_sources: list[tuple[Path, str]] = []
+    text_sources: list[tuple[Path, str]] = []
     if not sources_dir.exists():
         return {"text": "", "images": source_images}
     for source in sorted(sources_dir.iterdir()):
         if source.is_file() and source.suffix.lower() in TEXT_SOURCE_EXTENSIONS:
             content = _read_text_file(source)
-            if "$" in content or "\\begin{" in content:
-                formula_sources.append((source, content))
+            text_sources.append((source, content))
             if "![" in content:
                 content = _extract_markdown_images(project_path, source, content, source_images)
             if content.strip():
                 parts.append(content.strip())
     _collect_project_image_assets(project_path, source_images)
-    source_images.extend(_build_formula_assets(project_path, formula_sources))
+    formula_sources = _formula_sources_from_text_sources(text_sources)
+    if _formula_assets_need_refresh(project_path, text_sources, formula_sources):
+        _sync_project_formula_assets(project_path, text_sources=text_sources)
+    source_images.extend(_load_formula_assets(project_path))
     return {
         "text": "\n\n".join(parts).strip(),
         "images": source_images,
@@ -2027,6 +2846,88 @@ def _project_created_at(project_path: Path) -> float:
         return float(project_path.stat().st_ctime)
     except OSError:
         return 0.0
+
+
+def _render_asset_match_report_markdown(diagnostics: list[dict[str, Any]]) -> str:
+    lines = ["# 图文匹配诊断报告", ""]
+    if not diagnostics:
+        lines.append("暂无图文匹配诊断数据。")
+        return "\n".join(lines) + "\n"
+
+    for index, section in enumerate(diagnostics, start=1):
+        lines.append(f"## {index}. {section.get('section_title') or '未命名章节'}")
+        lead = str(section.get("lead") or "").strip()
+        if lead:
+            lines.append(f"- Lead: {lead}")
+        figure_refs = list(section.get("section_figure_refs") or [])
+        lines.append(f"- 显式图号引用: {', '.join(figure_refs) if figure_refs else '（无）'}")
+        lines.append(f"- 目标配图容量: {int(section.get('capacity') or 0)}")
+
+        selected_assets = list(section.get("selected_assets") or [])
+        lines.append("- 已选素材:")
+        if not selected_assets:
+            lines.append("  - （无）")
+        else:
+            for candidate in selected_assets:
+                lines.append(
+                    "  - [{decision}] {asset_id} {asset_label} | {asset_type} | score={score}".format(
+                        decision=str(candidate.get("decision") or "selected"),
+                        asset_id=str(candidate.get("asset_id") or "NO_ID"),
+                        asset_label=str(candidate.get("asset_label") or "asset"),
+                        asset_type=str(candidate.get("asset_type") or "image"),
+                        score=str(candidate.get("score") or 0),
+                    )
+                )
+                if candidate.get("figure_label"):
+                    lines.append(f"    - 图号: {candidate['figure_label']}")
+                if candidate.get("figure_caption"):
+                    lines.append(f"    - 图注: {candidate['figure_caption']}")
+                reasons = list(candidate.get("reasons") or [])
+                if reasons:
+                    lines.append(f"    - 原因: {'; '.join(reasons)}")
+
+        top_candidates = list(section.get("top_candidates") or [])
+        lines.append(f"- Top 候选 ({len(top_candidates)}):")
+        if not top_candidates:
+            lines.append("  - （无）")
+        else:
+            for rank, candidate in enumerate(top_candidates, start=1):
+                lines.append(
+                    "  {rank}. [{decision}] {asset_id} {asset_label} | {asset_type} | score={score} | explicit={explicit}".format(
+                        rank=rank,
+                        decision=str(candidate.get("decision") or "unknown"),
+                        asset_id=str(candidate.get("asset_id") or "NO_ID"),
+                        asset_label=str(candidate.get("asset_label") or "asset"),
+                        asset_type=str(candidate.get("asset_type") or "image"),
+                        score=str(candidate.get("score") or 0),
+                        explicit=str(bool(candidate.get("explicit_binding"))).lower(),
+                    )
+                )
+                if candidate.get("figure_label"):
+                    lines.append(f"     - 图号: {candidate['figure_label']}")
+                if candidate.get("figure_caption"):
+                    lines.append(f"     - 图注: {candidate['figure_caption']}")
+                reasons = list(candidate.get("reasons") or [])
+                if reasons:
+                    lines.append(f"     - 原因: {'; '.join(reasons)}")
+
+        lines.append("")
+
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def _write_asset_match_reports(project_path: Path, diagnostics: list[dict[str, Any]]) -> list[Path]:
+    if not diagnostics:
+        return []
+
+    notes_dir = project_path / "notes"
+    notes_dir.mkdir(parents=True, exist_ok=True)
+    json_path = notes_dir / ASSET_MATCH_REPORT_JSON
+    markdown_path = notes_dir / ASSET_MATCH_REPORT_MD
+
+    json_path.write_text(json.dumps(diagnostics, ensure_ascii=False, indent=2), encoding="utf-8")
+    markdown_path.write_text(_render_asset_match_report_markdown(diagnostics), encoding="utf-8")
+    return [json_path, markdown_path]
 
 
 def _project_updated_at(project_path: Path) -> float:
@@ -2071,6 +2972,10 @@ def _generate_ppt(project_path: Path, canvas_format: str | None = None) -> tuple
         resolved_canvas,
         source_images=list(source_bundle["images"]),
     )
+    _persist_asset_planning_state(project_path, list(source_bundle["images"]))
+    diagnostics = list(result.get("asset_match_diagnostics") or [])
+    report_paths = _write_asset_match_reports(project_path, diagnostics)
+    result["asset_match_report_paths"] = [str(path) for path in report_paths]
     return export_path, result, source_text[:5000]
 
 
@@ -2102,6 +3007,7 @@ def _project_to_json(project_path: Path) -> dict[str, object]:
         "has_preview": preview_record is not None,
         "live_preview_url": preview_record["url"] if preview_record else None,
         "live_preview_port": int(preview_record["port"]) if preview_record else None,
+        "asset_summary": _project_asset_summary(project_path),
     }
 
 
@@ -2185,8 +3091,21 @@ def _success_payload(
             entry["url"] = f"/api/projects/{quote(project_path.name)}/files/{quote(relative)}"
         return entry
 
+    asset_match_diagnostics = list(deck_meta.get("asset_match_diagnostics") or [])
+    report_paths = [
+        Path(str(raw_path))
+        for raw_path in deck_meta.get("asset_match_report_paths") or []
+        if Path(str(raw_path)).exists()
+    ]
+    formula_report_paths = [
+        path
+        for path in _formula_report_paths(project_path)
+        if path.exists()
+    ]
     artifacts = [_project_artifact(project_path, export_path)]
     artifacts.extend(_project_artifact(project_path, path) for path in text_sources[:4])
+    artifacts.extend(_project_artifact(project_path, path) for path in report_paths)
+    artifacts.extend(_project_artifact(project_path, path) for path in formula_report_paths)
 
     file_locations = [
         location_entry("项目目录", project_path),
@@ -2202,6 +3121,12 @@ def _success_payload(
         file_locations.append(location_entry(f"原始源文件 {index}", path))
     for index, path in enumerate(asset_dirs[:4], start=1):
         file_locations.append(location_entry(f"素材图片目录 {index}", path))
+    for path in report_paths:
+        label = "图文匹配诊断报告" if path.suffix.lower() == ".md" else "图文匹配诊断数据"
+        file_locations.append(location_entry(label, path))
+    for path in formula_report_paths:
+        label = "公式渲染报告" if path.suffix.lower() == ".md" else "公式渲染数据"
+        file_locations.append(location_entry(label, path))
 
     config_used = {
         "canvas_format": _detect_canvas_format(project_path),
@@ -2221,11 +3146,15 @@ def _success_payload(
             "alt": raw_image.get("alt"),
             "source_file": raw_image.get("source_file"),
             "asset_type": raw_image.get("asset_type"),
+            "source_kind": raw_image.get("source_kind"),
             "tags": raw_image.get("tags") or [],
             "width": width,
             "height": height,
             "orientation": raw_image.get("orientation"),
             "context": raw_image.get("context"),
+            "figure_label": raw_image.get("figure_label"),
+            "figure_caption": raw_image.get("figure_caption"),
+            "section_heading": raw_image.get("section_heading"),
         })
 
     return {
@@ -2250,6 +3179,12 @@ def _success_payload(
             "known_size_count": known_image_size_count,
             "items": image_items,
             "truncated": len(source_images) > len(image_items),
+        },
+        "asset_match_diagnostics": {
+            "count": len(asset_match_diagnostics),
+            "items": asset_match_diagnostics[:6],
+            "truncated": len(asset_match_diagnostics) > 6,
+            "report_files": [path.name for path in report_paths],
         },
     }
 
@@ -2283,7 +3218,12 @@ def _stream_result_event(payload: dict[str, object]) -> dict[str, Any]:
 
 @app.route("/")
 def index():
-    return render_template("project_manager.html")
+    return render_template("upload.html", projects=_list_projects())
+
+
+@app.route("/upload")
+def upload_page():
+    return render_template("upload.html", projects=_list_projects())
 
 
 @app.route("/api/upload", methods=["POST"])
@@ -2881,6 +3821,34 @@ def list_projects():
     return jsonify(_list_projects())
 
 
+@app.route("/api/projects/<project_name>/assets")
+def get_project_assets(project_name: str):
+    project_path = PROJECTS_DIR / project_name
+    if not project_path.exists():
+        return jsonify({"success": False, "error": "项目不存在"}), 404
+    if not _is_user_project_dir(project_path):
+        return jsonify({"success": False, "error": "系统项目目录不提供 GUI 管理。"}), 400
+
+    raw_limit = str(request.args.get("limit") or "").strip()
+    raw_offset = str(request.args.get("offset") or "").strip()
+    try:
+        limit = max(int(raw_limit), 0) if raw_limit else 0
+        offset = max(int(raw_offset), 0) if raw_offset else 0
+    except ValueError:
+        return jsonify({"success": False, "error": "limit / offset 必须是非负整数。"}), 400
+
+    payload = _project_assets_payload(
+        project_path,
+        asset_type=str(request.args.get("type") or "all"),
+        status=str(request.args.get("status") or "all"),
+        keyword=str(request.args.get("q") or ""),
+        source_file=str(request.args.get("source_file") or ""),
+        limit=limit,
+        offset=offset,
+    )
+    return jsonify(payload)
+
+
 @app.route("/api/projects/<project_name>/preview/start", methods=["POST"])
 def start_project_preview(project_name: str):
     project_path = PROJECTS_DIR / project_name
@@ -2924,6 +3892,60 @@ def stop_project_preview(project_name: str):
         "message": str(preview.get("message") or "Live Preview 已关闭。"),
         "preview": preview,
         "project": _project_to_json(project_path),
+    })
+
+
+@app.route("/api/projects/<project_name>/preview/state")
+def project_preview_state(project_name: str):
+    project_path = PROJECTS_DIR / project_name
+    if not project_path.exists():
+        return jsonify({"success": False, "error": "项目不存在"}), 404
+    if not _is_user_project_dir(project_path):
+        return jsonify({"success": False, "error": "系统项目目录不提供 GUI 管理。"}), 400
+
+    record = _preview_record(project_name, project_path)
+    if record is None:
+        return jsonify({
+            "success": True,
+            "project_name": project_name,
+            "running": False,
+            "live_preview_url": "",
+            "port": None,
+            "config": {},
+            "progress": {},
+            "slides": [],
+            "preview_error": "",
+        })
+
+    base_url = str(record.get("url") or "").rstrip("/")
+    config: dict[str, Any] = {}
+    progress: dict[str, Any] = {}
+    slides_payload: dict[str, Any] = {}
+    errors: list[str] = []
+
+    for endpoint, target in (("/api/config", "config"), ("/api/progress", "progress"), ("/api/slides", "slides")):
+        try:
+            payload = _fetch_preview_json(base_url, endpoint)
+        except Exception as exc:
+            errors.append(f"{endpoint}: {exc}")
+            continue
+        if target == "config":
+            config = payload
+        elif target == "progress":
+            progress = payload
+        else:
+            slides_payload = payload
+
+    return jsonify({
+        "success": True,
+        "project_name": project_name,
+        "running": True,
+        "live_preview_url": base_url,
+        "port": int(record.get("port") or 0) or None,
+        "config": config,
+        "progress": progress,
+        "slides": list(slides_payload.get("slides") or []),
+        "preview_error": " | ".join(errors),
     })
 
 

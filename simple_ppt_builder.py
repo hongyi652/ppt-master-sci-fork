@@ -28,10 +28,14 @@ CANVAS_SIZES = {
 MAX_SLIDES = 14
 MAX_OUTLINE_ITEMS = 8
 MAX_BULLETS_PER_SLIDE = 5
+MIN_AUTO_ASSET_SCORE = 2.0
+MIN_CAPTION_BIND_TOKENS = 2
+DIAGNOSTIC_CANDIDATE_LIMIT = 6
 FONT_FAMILY = "Microsoft YaHei"
 SUPPORTED_LAYOUTS = {"insight", "cards", "comparison", "timeline", "image_focus", "spotlight", "summary"}
 SUPPORTED_PAGE_RHYTHMS = {"anchor", "dense", "breathing"}
 ASSET_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_+\-]{3,}|[\u4e00-\u9fff]{2,}")
+FIGURE_REF_PATTERN = re.compile(r"(?:\bfig(?:ure)?\.?\s*|图\s*)([A-Za-z]?\d+(?:\.\d+)?[A-Za-z]?)", re.I)
 EMU_PER_PIXEL = 9525
 ASSET_METADATA_TOKEN_FIELDS = (
     "purpose",
@@ -44,11 +48,18 @@ ASSET_METADATA_TOKEN_FIELDS = (
     "source_kind",
     "original_filename",
     "source_namespace",
+    "figure_label",
+    "figure_ref_key",
+    "figure_caption",
+    "section_heading",
+    "section_heading_path",
 )
 ASSET_PRIORITY_METADATA_FIELDS = (
     "purpose",
     "search_query",
     "source_title",
+    "figure_caption",
+    "section_heading",
 )
 
 
@@ -123,7 +134,7 @@ def build_presentation(
         if planned_sections:
             sections = planned_sections
 
-    sections = _apply_source_assets_to_sections(sections, source_images or [])
+    sections, asset_match_diagnostics = _apply_source_assets_to_sections(sections, source_images or [])
 
     _add_cover_slide(prs, title, subtitle, project_name)
 
@@ -161,6 +172,7 @@ def build_presentation(
         "slide_count": len(prs.slides),
         "output_path": str(output_path),
         "placed_image_count": placed_image_count,
+        "asset_match_diagnostics": asset_match_diagnostics,
     }
 
 
@@ -320,8 +332,27 @@ def _renderable_source_assets(source_images: list[dict[str, Any]]) -> list[dict[
             continue
         asset_copy = dict(raw_asset)
         asset_copy["_path"] = asset_path
+        asset_copy["_source_asset"] = raw_asset
         assets.append(asset_copy)
     return assets
+
+
+def _set_asset_planning_flags(
+    raw_asset: dict[str, Any],
+    *,
+    candidate_material: bool | None = None,
+    selected_for_deck: bool | None = None,
+) -> None:
+    targets = [raw_asset]
+    source_asset = raw_asset.get("_source_asset")
+    if isinstance(source_asset, dict) and source_asset is not raw_asset:
+        targets.append(source_asset)
+
+    for target in targets:
+        if candidate_material is not None:
+            target["candidate_material"] = candidate_material
+        if selected_for_deck is not None:
+            target["selected_for_deck"] = selected_for_deck
 
 
 def _asset_tokens(raw_asset: dict[str, Any]) -> set[str]:
@@ -351,50 +382,207 @@ def _asset_usage_count(raw_asset: dict[str, Any]) -> int:
         return 0
 
 
+def _normalize_figure_ref(text: str) -> str:
+    cleaned = str(text or "").strip()
+    if not cleaned:
+        return ""
+    cleaned = re.sub(r"(?i)\bfigure\b|\bfig\.?\b|图", "", cleaned)
+    cleaned = re.sub(r"[^A-Za-z0-9.]+", "", cleaned).lower()
+    if not cleaned:
+        return ""
+    return f"fig{cleaned}"
+
+
+def _extract_figure_refs(text: str) -> set[str]:
+    refs: set[str] = set()
+    for match in FIGURE_REF_PATTERN.finditer(text or ""):
+        ref_key = _normalize_figure_ref(match.group(1))
+        if ref_key:
+            refs.add(ref_key)
+    return refs
+
+
+def _asset_figure_refs(raw_asset: dict[str, Any]) -> set[str]:
+    refs: set[str] = set()
+    for key in ("figure_ref_key", "figure_label"):
+        ref_key = _normalize_figure_ref(str(raw_asset.get(key) or ""))
+        if ref_key:
+            refs.add(ref_key)
+    return refs
+
+
+def _is_original_source_visual(raw_asset: dict[str, Any]) -> bool:
+    source_kind = str(raw_asset.get("source_kind") or "").lower()
+    if source_kind not in {"mineru", "pptx_picture", "markdown_asset"}:
+        return False
+    if str(raw_asset.get("figure_ref_key") or "").strip() or str(raw_asset.get("figure_caption") or "").strip():
+        return True
+    hint = " ".join(
+        [
+            str(raw_asset.get("alt") or ""),
+            str(raw_asset.get("context") or ""),
+            str(raw_asset.get("reference") or ""),
+        ]
+    ).lower()
+    return bool(re.search(r"原图|原文|论文|截图|screenshot|paper|figure|fig\.?|图\s*\d", hint))
+
+
 def _asset_priority(raw_asset: dict[str, Any]) -> float:
     asset_type = str(raw_asset.get("asset_type") or "image")
     if asset_type == "formula":
-        return 5.0
-    if asset_type == "chart":
-        return 4.0
-    if asset_type == "diagram":
-        return 3.0
+        return 7.0
+    if asset_type in {"chart", "diagram"}:
+        return 5.5
+    if _is_original_source_visual(raw_asset):
+        return 4.5
     return 2.0
 
 
-def _score_asset_for_section(section: Section, raw_asset: dict[str, Any]) -> float:
-    section_text = " ".join([section.title, section.lead, *section.bullets])
+def _section_text(section: Section) -> str:
+    return " ".join([section.title, section.lead, *section.bullets])
+
+
+def _section_asset_token_matches(section: Section, raw_asset: dict[str, Any]) -> tuple[set[str], set[str]]:
+    section_tokens = _text_tokens(_section_text(section))
+    return section_tokens & _asset_tokens(raw_asset), section_tokens & _priority_metadata_tokens(raw_asset)
+
+
+def _analyze_asset_for_section(section: Section, raw_asset: dict[str, Any]) -> dict[str, Any]:
+    section_text = _section_text(section)
     section_tokens = _text_tokens(section_text)
-    asset_tokens = _asset_tokens(raw_asset)
-    score = float(len(section_tokens & asset_tokens) * 4)
-    score += float(len(section_tokens & _priority_metadata_tokens(raw_asset)) * 2)
+    shared_tokens, shared_priority_tokens = _section_asset_token_matches(section, raw_asset)
+    shared_tokens_list = sorted(shared_tokens)
+    shared_priority_tokens_list = sorted(shared_priority_tokens)
+    caption_tokens = _text_tokens(str(raw_asset.get("figure_caption") or ""))
+    shared_caption_tokens = sorted(section_tokens & caption_tokens)
+    section_figure_refs = _extract_figure_refs(section_text)
+    asset_figure_refs = _asset_figure_refs(raw_asset)
+    matched_figure_refs = sorted(section_figure_refs & asset_figure_refs)
     asset_type = str(raw_asset.get("asset_type") or "image")
     source_kind = str(raw_asset.get("source_kind") or "").lower()
     usage_count = _asset_usage_count(raw_asset)
     lowered_text = section_text.lower()
+
+    reasons: list[str] = []
+    score = float(len(shared_tokens_list) * 4)
+    score += float(len(shared_priority_tokens_list) * 2)
+
+    explicit_caption_binding = _is_original_source_visual(raw_asset) and len(shared_caption_tokens) >= MIN_CAPTION_BIND_TOKENS
+    explicit_binding = False
+    if matched_figure_refs:
+        explicit_binding = True
+        score += 24.0
+        reasons.append(f"explicit figure ref match: {', '.join(matched_figure_refs[:3])}")
+    elif explicit_caption_binding:
+        explicit_binding = True
+        score += float(min(len(shared_caption_tokens), 4) * 4)
+        reasons.append(f"explicit figure caption match: {', '.join(shared_caption_tokens[:4])}")
+    elif shared_caption_tokens:
+        score += float(min(len(shared_caption_tokens), 4) * 1.5)
+        reasons.append(f"shared figure caption tokens: {', '.join(shared_caption_tokens[:4])}")
+
+    if shared_tokens_list:
+        reasons.append(f"shared asset tokens: {', '.join(shared_tokens_list[:4])}")
+    if shared_priority_tokens_list:
+        reasons.append(f"shared priority metadata: {', '.join(shared_priority_tokens_list[:4])}")
+
     if asset_type == "formula" and re.search(r"公式|方程|推导|模型|equation|formula|latex", lowered_text):
-        score += 4
+        score += 4.0
+        reasons.append("formula cue matched")
     if asset_type in {"chart", "diagram"} and re.search(r"图|表|趋势|对比|流程|架构|figure|chart|graph|diagram|workflow|trend", lowered_text):
-        score += 3
+        score += 3.0
+        reasons.append("chart/diagram cue matched")
     if asset_type == "image" and re.search(r"照片|图像|实验|装置|现场|photo|image|figure", lowered_text):
-        score += 2
+        score += 2.0
+        reasons.append("image cue matched")
     if usage_count > 1:
-        score += min(usage_count - 1, 3) * 0.5
+        usage_bonus = min(usage_count - 1, 3) * 0.5
+        score += usage_bonus
+        reasons.append(f"reuse evidence bonus: {usage_bonus:.1f}")
     if source_kind in {"mineru", "pptx_picture", "markdown_asset"} and asset_type in {"chart", "diagram", "formula"}:
         score += 1.0
+        reasons.append("scientific visual source bonus")
+    if _is_original_source_visual(raw_asset):
+        score += 1.5
+        reasons.append("original source visual priority")
     if source_kind in {"mineru", "pptx_picture"} and re.search(r"原图|原文|论文|截图|screenshot|paper|figure", lowered_text):
         score += 1.0
-    return score + _asset_priority(raw_asset) * 0.1
+        reasons.append("paper screenshot cue matched")
+
+    priority = _asset_priority(raw_asset)
+    score += priority * 0.5
+    reasons.append(f"asset priority weight: {priority:.1f}")
+
+    meaningful_match = bool(shared_tokens_list or shared_priority_tokens_list or matched_figure_refs or explicit_caption_binding)
+    if not meaningful_match and asset_type == "formula" and re.search(r"公式|方程|推导|模型|equation|formula|latex", lowered_text):
+        meaningful_match = True
+
+    return {
+        "score": score,
+        "explicit_binding": explicit_binding,
+        "meaningful_match": meaningful_match,
+        "shared_tokens": shared_tokens_list,
+        "shared_priority_tokens": shared_priority_tokens_list,
+        "shared_caption_tokens": shared_caption_tokens,
+        "section_figure_refs": sorted(section_figure_refs),
+        "asset_figure_refs": sorted(asset_figure_refs),
+        "matched_figure_refs": matched_figure_refs,
+        "reasons": reasons,
+    }
+
+
+def _score_asset_for_section(section: Section, raw_asset: dict[str, Any]) -> float:
+    return float(_analyze_asset_for_section(section, raw_asset)["score"])
+
+
+def _asset_display_label(raw_asset: dict[str, Any]) -> str:
+    asset_path = raw_asset.get("_path")
+    fallback = asset_path.name if isinstance(asset_path, Path) else "asset"
+    return _clean_inline(str(raw_asset.get("alt") or fallback))[:120] or fallback
+
+
+def _serialize_asset_candidate(raw_asset: dict[str, Any], analysis: dict[str, Any], decision: str) -> dict[str, Any]:
+    asset_path = raw_asset.get("_path")
+    return {
+        "asset_id": str(raw_asset.get("id") or ""),
+        "asset_label": _asset_display_label(raw_asset),
+        "asset_type": str(raw_asset.get("asset_type") or "image"),
+        "source_kind": str(raw_asset.get("source_kind") or ""),
+        "path": str(asset_path) if isinstance(asset_path, Path) else "",
+        "score": round(float(analysis.get("score") or 0.0), 2),
+        "decision": decision,
+        "explicit_binding": bool(analysis.get("explicit_binding")),
+        "figure_label": str(raw_asset.get("figure_label") or ""),
+        "figure_caption": str(raw_asset.get("figure_caption") or "")[:180],
+        "section_heading": str(raw_asset.get("section_heading") or ""),
+        "matched_figure_refs": list(analysis.get("matched_figure_refs") or []),
+        "shared_tokens": list(analysis.get("shared_tokens") or [])[:8],
+        "shared_priority_tokens": list(analysis.get("shared_priority_tokens") or [])[:8],
+        "shared_caption_tokens": list(analysis.get("shared_caption_tokens") or [])[:8],
+        "reasons": list(analysis.get("reasons") or [])[:6],
+    }
 
 
 def _section_asset_capacity(section: Section) -> int:
     return 2 if len(section.bullets) <= 4 else 1
 
 
-def _apply_source_assets_to_sections(sections: list[Section], source_images: list[dict[str, Any]]) -> list[Section]:
+def _apply_source_assets_to_sections(
+    sections: list[Section],
+    source_images: list[dict[str, Any]],
+) -> tuple[list[Section], list[dict[str, Any]]]:
     assets = _renderable_source_assets(source_images)
+    diagnostics: list[dict[str, Any]] = []
+    for raw_asset in assets:
+        _set_asset_planning_flags(raw_asset, candidate_material=False, selected_for_deck=False)
     if not sections or not assets:
-        return sections
+        return sections, diagnostics
+
+    assets_by_path = {
+        raw_asset.get("_path"): raw_asset
+        for raw_asset in assets
+        if isinstance(raw_asset.get("_path"), Path)
+    }
 
     used_paths = {
         image_path
@@ -404,56 +592,95 @@ def _apply_source_assets_to_sections(sections: list[Section], source_images: lis
     }
 
     for section in sections:
+        section_figure_refs = sorted(_extract_figure_refs(_section_text(section)))
+        prebound_assets = [
+            assets_by_path[image_path]
+            for image_path in section.image_paths
+            if image_path in assets_by_path
+        ]
+        for raw_asset in prebound_assets:
+            _set_asset_planning_flags(raw_asset, candidate_material=True, selected_for_deck=True)
         capacity = max(_section_asset_capacity(section) - len(section.image_paths), 0)
-        if capacity <= 0:
-            continue
-
-        scored_assets: list[tuple[float, int, dict[str, Any]]] = []
+        scored_assets: list[tuple[dict[str, Any], int, dict[str, Any]]] = []
         for index, raw_asset in enumerate(assets):
             asset_path = raw_asset.get("_path")
             if not isinstance(asset_path, Path) or asset_path in used_paths:
                 continue
-            scored_assets.append((_score_asset_for_section(section, raw_asset), index, raw_asset))
-        scored_assets.sort(key=lambda item: (item[0], -item[1]), reverse=True)
+            analysis = _analyze_asset_for_section(section, raw_asset)
+            if analysis["meaningful_match"] and (analysis["explicit_binding"] or analysis["score"] >= MIN_AUTO_ASSET_SCORE):
+                _set_asset_planning_flags(raw_asset, candidate_material=True)
+            scored_assets.append((analysis, index, raw_asset))
+        scored_assets.sort(
+            key=lambda item: (item[0]["explicit_binding"], item[0]["score"], -item[1]),
+            reverse=True,
+        )
 
         matched_assets: list[dict[str, Any]] = []
-        for score, _index, raw_asset in scored_assets:
+        selected_paths = {
+            image_path
+            for image_path in section.image_paths
+            if isinstance(image_path, Path)
+        }
+        for analysis, _index, raw_asset in scored_assets:
             asset_path = raw_asset.get("_path")
             if not isinstance(asset_path, Path):
                 continue
-            if matched_assets and score <= 0:
+            if not analysis["explicit_binding"] and analysis["score"] < MIN_AUTO_ASSET_SCORE:
                 break
-            section.image_paths.append(asset_path)
-            used_paths.add(asset_path)
-            matched_assets.append(raw_asset)
+            if not analysis["meaningful_match"]:
+                continue
             if len(matched_assets) >= capacity:
-                break
-
-        if matched_assets and section.layout_hint == "insight":
-            if len(section.image_paths) >= 2 or any(
-                str(raw_asset.get("asset_type") or "") in {"formula", "chart", "diagram"}
-                for raw_asset in matched_assets
-            ):
-                section.layout_hint = "image_focus"
-
-    remaining_assets = [
-        raw_asset for raw_asset in assets
-        if isinstance(raw_asset.get("_path"), Path) and raw_asset.get("_path") not in used_paths
-    ]
-    for section in sections:
-        capacity = max(_section_asset_capacity(section) - len(section.image_paths), 0)
-        while capacity > 0 and remaining_assets:
-            raw_asset = remaining_assets.pop(0)
-            asset_path = raw_asset.get("_path")
-            if not isinstance(asset_path, Path) or asset_path in used_paths:
                 continue
             section.image_paths.append(asset_path)
             used_paths.add(asset_path)
-            capacity -= 1
-        if section.image_paths and section.layout_hint == "insight" and len(section.bullets) <= 3:
-            section.layout_hint = "image_focus"
+            selected_paths.add(asset_path)
+            matched_assets.append(raw_asset)
+            _set_asset_planning_flags(raw_asset, candidate_material=True, selected_for_deck=True)
 
-    return sections
+        if (matched_assets or prebound_assets) and section.layout_hint == "insight":
+            if len(section.image_paths) >= 2 or any(
+                str(raw_asset.get("asset_type") or "") in {"formula", "chart", "diagram"}
+                for raw_asset in [*prebound_assets, *matched_assets]
+            ):
+                section.layout_hint = "image_focus"
+
+        selected_assets = [
+            _serialize_asset_candidate(
+                raw_asset,
+                _analyze_asset_for_section(section, raw_asset),
+                "prebound" if raw_asset in prebound_assets else "selected",
+            )
+            for raw_asset in [*prebound_assets, *matched_assets]
+        ]
+        top_candidates: list[dict[str, Any]] = []
+        for analysis, _index, raw_asset in scored_assets[:DIAGNOSTIC_CANDIDATE_LIMIT]:
+            asset_path = raw_asset.get("_path")
+            if not isinstance(asset_path, Path):
+                continue
+            if asset_path in selected_paths:
+                decision = "selected"
+            elif not analysis["explicit_binding"] and analysis["score"] < MIN_AUTO_ASSET_SCORE:
+                decision = "below_threshold"
+            elif not analysis["meaningful_match"]:
+                decision = "no_meaningful_match"
+            else:
+                decision = "not_selected"
+            top_candidates.append(_serialize_asset_candidate(raw_asset, analysis, decision))
+
+        diagnostics.append(
+            {
+                "section_title": section.title,
+                "lead": section.lead,
+                "layout_hint": section.layout_hint,
+                "capacity": _section_asset_capacity(section),
+                "available_capacity": capacity,
+                "section_figure_refs": section_figure_refs,
+                "selected_assets": selected_assets,
+                "top_candidates": top_candidates,
+            }
+        )
+
+    return sections, diagnostics
 
 
 def _lines_to_bullets(lines: list[str]) -> list[str]:

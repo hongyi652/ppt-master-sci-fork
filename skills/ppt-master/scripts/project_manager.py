@@ -43,6 +43,10 @@ TOOLS_DIR = Path(__file__).resolve().parent
 SKILL_DIR = TOOLS_DIR.parent
 REPO_ROOT = SKILL_DIR.parent.parent
 SOURCE_DIRNAME = "sources"
+FORMULA_MANIFEST_FILENAME = "formula_manifest.json"
+FORMULA_REPORT_JSON = "formula_render_report.json"
+FORMULA_REPORT_MD = "formula_render_report.md"
+ASSET_TAG_PATTERN = re.compile(r"[A-Za-z0-9_+\-]{3,}|[\u4e00-\u9fff]{2,}")
 TEXT_SOURCE_SUFFIXES = {".md", ".markdown", ".txt"}
 TABLE_TEXT_SUFFIXES = {".csv", ".tsv"}
 PDF_SUFFIXES = {".pdf"}
@@ -61,6 +65,20 @@ IMAGE_ASSET_SUFFIXES = {
     ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".tif",
     ".emf", ".wmf", ".svg",
 }
+
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
+
+from extract_formulas import (  # type: ignore
+    build_manifest as build_formula_manifest,
+    extract_formulas_from_markdown,
+    save_manifest as save_formula_manifest,
+)
+from latex_to_svg import (  # type: ignore
+    load_manifest as load_formula_manifest,
+    process_manifest as process_formula_manifest,
+    save_manifest as save_rendered_formula_manifest,
+)
 
 
 def _curl_cffi_available() -> bool:
@@ -739,6 +757,193 @@ class ProjectManager:
             else:
                 summary["notes"].append(f"{item}: archived only, no automatic conversion")
 
+        formula_summary = self._sync_formula_assets(project_dir)
+        if formula_summary.get("total"):
+            summary["notes"].append(
+                "Formula sync: "
+                f"{formula_summary.get('rendered', 0)} rendered, "
+                f"{formula_summary.get('failed', 0)} failed, "
+                f"{formula_summary.get('pending', 0)} pending "
+                f"out of {formula_summary.get('total', 0)} extracted formulas."
+            )
+        elif formula_summary.get("removed"):
+            summary["notes"].append("Formula sync: no LaTeX formulas detected, cleared stale formula artifacts.")
+
+        return summary
+
+    def _extract_asset_tags(self, *parts: str) -> list[str]:
+        tags: list[str] = []
+        seen: set[str] = set()
+        for part in parts:
+            for raw_tag in ASSET_TAG_PATTERN.findall(part or ""):
+                tag = raw_tag.strip().lower()
+                if len(tag) < 2 or tag.isdigit() or tag in seen:
+                    continue
+                seen.add(tag)
+                tags.append(tag)
+        return tags[:16]
+
+    def _formula_report_paths(self, project_dir: Path) -> tuple[Path, Path]:
+        notes_dir = project_dir / "notes"
+        return notes_dir / FORMULA_REPORT_JSON, notes_dir / FORMULA_REPORT_MD
+
+    def _clear_formula_artifacts(self, project_dir: Path) -> list[str]:
+        images_dir = project_dir / "images"
+        manifest_path = images_dir / FORMULA_MANIFEST_FILENAME
+        report_json_path, report_md_path = self._formula_report_paths(project_dir)
+        removed: list[str] = []
+        for path in [manifest_path, report_json_path, report_md_path, *sorted(images_dir.glob("formula_*.svg"))]:
+            if not path.exists() or not path.is_file():
+                continue
+            try:
+                path.unlink()
+            except OSError:
+                continue
+            removed.append(str(path))
+        return removed
+
+    def _write_formula_report(self, project_dir: Path, report: dict[str, object]) -> None:
+        report_json_path, report_md_path = self._formula_report_paths(project_dir)
+        report_json_path.parent.mkdir(parents=True, exist_ok=True)
+        report_json_path.write_text(
+            json.dumps(report, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+
+        summary = dict(report.get("summary") or {})
+        failed_items = list(report.get("failed_formulas") or [])
+        lines = [
+            "# Formula Render Report",
+            "",
+            f"- Total formulas: {summary.get('total', 0)}",
+            f"- Rendered: {summary.get('rendered', 0)}",
+            f"- Failed: {summary.get('failed', 0)}",
+            f"- Pending: {summary.get('pending', 0)}",
+            f"- Missing SVG: {summary.get('missing', 0)}",
+        ]
+        if failed_items:
+            lines.extend(["", "## Failed formulas", ""])
+            for item in failed_items:
+                if not isinstance(item, dict):
+                    continue
+                source_file = str(item.get("source_file") or "unknown")
+                line_number = item.get("line_number")
+                latex = str(item.get("latex") or "").strip().replace("\n", " ")
+                render_error = str(item.get("render_error") or "").strip()
+                lines.append(f"- {source_file}:{line_number or '?'} {latex[:160]}")
+                if render_error:
+                    lines.append(f"  - Error: {render_error}")
+        report_md_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    def _sync_formula_assets(self, project_dir: Path) -> dict[str, object]:
+        sources_dir = self._source_dir(project_dir)
+        text_sources: list[tuple[Path, str]] = []
+        if sources_dir.exists():
+            for source_path in sorted(sources_dir.iterdir()):
+                if not source_path.is_file() or source_path.suffix.lower() not in TEXT_SOURCE_SUFFIXES:
+                    continue
+                text_sources.append((source_path, source_path.read_text(encoding="utf-8")))
+
+        formula_sources = [
+            (source_path, content)
+            for source_path, content in text_sources
+            if "$" in content or "\\begin{" in content
+        ]
+        removed = self._clear_formula_artifacts(project_dir)
+        if not formula_sources:
+            return {
+                "total": 0,
+                "rendered": 0,
+                "failed": 0,
+                "pending": 0,
+                "missing": 0,
+                "removed": removed,
+            }
+
+        extracted_formulas = []
+        for source_path, content in formula_sources:
+            extracted_formulas.extend(
+                extract_formulas_from_markdown(content, source_file=source_path.name)
+            )
+        if not extracted_formulas:
+            return {
+                "total": 0,
+                "rendered": 0,
+                "failed": 0,
+                "pending": 0,
+                "missing": 0,
+                "removed": removed,
+            }
+
+        manifest = build_formula_manifest(extracted_formulas, source_file="")
+        formulas = list(manifest.get("formulas") or [])
+        for formula in formulas:
+            if not isinstance(formula, dict):
+                continue
+            formula["render"] = True
+            formula["status"] = "pending"
+            formula["tags"] = formula.get("tags") or self._extract_asset_tags(
+                str(formula.get("latex") or ""),
+                str(formula.get("context") or ""),
+                str(formula.get("source_file") or ""),
+            )
+            formula["candidate_material"] = False
+            formula["selected_for_deck"] = False
+
+        manifest_path = project_dir / "images" / FORMULA_MANIFEST_FILENAME
+        save_formula_manifest(manifest, manifest_path)
+        try:
+            process_formula_manifest(manifest_path)
+        except Exception as exc:
+            render_error = str(exc).strip() or "Formula rendering failed."
+            entries = load_formula_manifest(manifest_path)
+            for entry in entries:
+                if str(entry.status or "pending").strip().lower() == "rendered":
+                    continue
+                entry.status = "failed"
+                if not str(entry.error or "").strip():
+                    entry.error = render_error
+            save_rendered_formula_manifest(manifest_path, entries)
+
+        summary = {
+            "total": 0,
+            "rendered": 0,
+            "failed": 0,
+            "pending": 0,
+            "missing": 0,
+        }
+        failed_formulas: list[dict[str, object]] = []
+        for entry in load_formula_manifest(manifest_path):
+            status = str(entry.status or "pending").strip().lower()
+            svg_path = manifest_path.parent / f"formula_{entry.id}.svg"
+            if status == "error":
+                status = "failed"
+            if status == "rendered" and not svg_path.exists():
+                status = "missing"
+            elif status not in {"rendered", "failed", "pending", "missing"}:
+                status = "rendered" if svg_path.exists() else "pending"
+
+            summary["total"] += 1
+            summary[status] += 1
+            if status in {"failed", "missing"}:
+                failed_formulas.append({
+                    "id": entry.id,
+                    "source_file": entry.source_file,
+                    "line_number": entry.line_number,
+                    "latex": entry.latex,
+                    "status": status,
+                    "render_error": entry.error,
+                    "path": str(svg_path) if svg_path.exists() else "",
+                })
+
+        self._write_formula_report(
+            project_dir,
+            {
+                "summary": summary,
+                "failed_formulas": failed_formulas,
+            },
+        )
+        summary["removed"] = removed
         return summary
 
     def validate_project(self, project_path: str) -> tuple[bool, list[str], list[str]]:

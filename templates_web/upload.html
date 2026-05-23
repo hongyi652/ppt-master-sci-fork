@@ -145,6 +145,19 @@
             padding: 24px;
         }
 
+        .panel-span-full {
+            grid-column: 1 / -1;
+        }
+
+        .operation-panel {
+            display: none;
+            margin-top: 24px;
+        }
+
+        .operation-panel.active {
+            display: block;
+        }
+
         .panel h2 {
             font-size: 18px;
             margin-bottom: 16px;
@@ -154,37 +167,6 @@
             color: var(--muted);
             font-size: 13px;
             margin-bottom: 14px;
-        }
-
-        .tabs {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            margin-bottom: 18px;
-        }
-
-        .tab {
-            padding: 12px 14px;
-            border-radius: 14px;
-            border: 1px solid var(--line);
-            background: rgba(255, 255, 255, 0.02);
-            color: var(--muted);
-            cursor: pointer;
-            font-size: 14px;
-        }
-
-        .tab.active {
-            color: #f8fbff;
-            border-color: rgba(56, 189, 248, 0.34);
-            background: linear-gradient(135deg, rgba(56, 189, 248, 0.16), rgba(37, 99, 235, 0.18));
-        }
-
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
         }
 
         .dropzone,
@@ -229,36 +211,6 @@
             margin-top: 8px;
         }
 
-        .selected-file {
-            display: none;
-            margin-top: 12px;
-            padding: 12px 14px;
-            border-radius: 14px;
-            background: rgba(56, 189, 248, 0.10);
-            border: 1px solid rgba(56, 189, 248, 0.22);
-            align-items: center;
-            gap: 10px;
-        }
-
-        .selected-file.show {
-            display: flex;
-        }
-
-        .selected-file .filename {
-            flex: 1;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .selected-file button {
-            border: none;
-            background: transparent;
-            color: var(--muted);
-            font-size: 18px;
-            cursor: pointer;
-        }
-
         label {
             display: block;
             color: var(--muted);
@@ -284,12 +236,6 @@
         select:focus,
         textarea:focus {
             border-color: rgba(56, 189, 248, 0.48);
-        }
-
-        .row {
-            display: grid;
-            grid-template-columns: 1fr 180px;
-            gap: 12px;
         }
 
         .button-row {
@@ -660,6 +606,115 @@
             max-height: 240px;
         }
 
+        .match-section {
+            border-radius: 16px;
+            border: 1px solid rgba(56, 189, 248, 0.16);
+            background: rgba(56, 189, 248, 0.05);
+            overflow: hidden;
+        }
+
+        .match-section + .match-section {
+            margin-top: 10px;
+        }
+
+        .match-summary {
+            cursor: pointer;
+            list-style: none;
+            padding: 14px 16px;
+            display: flex;
+            align-items: start;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .match-summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .match-title {
+            display: block;
+            font-size: 13px;
+            color: #f8fbff;
+            margin-bottom: 6px;
+        }
+
+        .match-subtitle,
+        .match-reason,
+        .match-meta {
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.6;
+            word-break: break-word;
+        }
+
+        .match-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+        .match-badge {
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            background: rgba(255, 255, 255, 0.03);
+            color: #d8f3ff;
+        }
+
+        .match-badge.success {
+            border-color: rgba(52, 211, 153, 0.3);
+            background: rgba(52, 211, 153, 0.12);
+            color: #baf7dc;
+        }
+
+        .match-badge.warning {
+            border-color: rgba(250, 204, 21, 0.28);
+            background: rgba(250, 204, 21, 0.12);
+            color: #fde68a;
+        }
+
+        .match-body {
+            padding: 0 16px 16px;
+            display: grid;
+            gap: 12px;
+        }
+
+        .match-group {
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .match-group h3 {
+            font-size: 12px;
+            margin-bottom: 8px;
+            color: #f8fbff;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .match-list {
+            display: grid;
+            gap: 8px;
+        }
+
+        .match-candidate {
+            padding: 10px 12px;
+            border-radius: 12px;
+            background: rgba(4, 10, 22, 0.46);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .match-candidate strong {
+            display: block;
+            color: #f8fbff;
+            font-size: 12px;
+            margin-bottom: 4px;
+        }
+
         .project-path {
             margin-top: 6px;
             color: #cbd5e1;
@@ -699,6 +754,598 @@
             margin-top: 14px;
         }
 
+        .panel-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: start;
+        }
+
+        .panel-head .subtle {
+            margin-bottom: 0;
+        }
+
+        .panel-head-note {
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.6;
+            text-align: right;
+        }
+
+        .project-toolbar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .project-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 18px;
+        }
+
+        .project-stat {
+            padding: 14px 16px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(148, 163, 184, 0.10);
+        }
+
+        .project-stat strong {
+            display: block;
+            font-size: 26px;
+            letter-spacing: -0.03em;
+            color: #f8fbff;
+        }
+
+        .project-stat span {
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .project-filter-grid {
+            display: grid;
+                grid-template-columns: 1.4fr repeat(6, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 18px;
+        }
+
+        .project-summary-line {
+            margin-top: 14px;
+        }
+
+        .workspace-panel {
+            margin-top: 24px;
+        }
+
+        .focused-preview-shell {
+            margin-top: 18px;
+            padding: 18px;
+            border-radius: 18px;
+            border: 1px solid rgba(56, 189, 248, 0.16);
+            background: rgba(8, 16, 30, 0.62);
+        }
+
+        .focused-preview-empty {
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.7;
+        }
+
+        .focused-preview-content {
+            display: none;
+        }
+
+        .focused-preview-shell.active .focused-preview-empty {
+            display: none;
+        }
+
+        .focused-preview-shell.active .focused-preview-content {
+            display: block;
+        }
+
+        .focused-asset-shell {
+            margin-top: 18px;
+            padding: 18px;
+            border-radius: 18px;
+            border: 1px solid rgba(56, 189, 248, 0.16);
+            background: rgba(8, 16, 30, 0.62);
+        }
+
+        .focused-asset-content {
+            display: none;
+        }
+
+        .focused-asset-shell.active .focused-preview-empty {
+            display: none;
+        }
+
+        .focused-asset-shell.active .focused-asset-content {
+            display: block;
+        }
+
+        .asset-summary-strip {
+            margin-top: 16px;
+            padding: 12px 14px;
+            border-radius: 14px;
+            border: 1px solid rgba(148, 163, 184, 0.10);
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.7;
+        }
+
+        .asset-filter-grid {
+            display: grid;
+            grid-template-columns: 1fr repeat(3, minmax(0, 180px));
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .asset-tab-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 14px;
+        }
+
+        .asset-tab-row .btn.active {
+            border-color: rgba(56, 189, 248, 0.34);
+            background: rgba(56, 189, 248, 0.14);
+            color: #d8f3ff;
+        }
+
+        .asset-failure-box {
+            display: none;
+            margin-top: 14px;
+            padding: 14px 16px;
+            border-radius: 16px;
+            border: 1px solid rgba(251, 113, 133, 0.26);
+            background: rgba(251, 113, 133, 0.08);
+        }
+
+        .asset-failure-box.show {
+            display: block;
+        }
+
+        .asset-failure-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .asset-failure-head strong {
+            color: #ffd5dd;
+            font-size: 13px;
+        }
+
+        .asset-failure-list {
+            display: grid;
+            gap: 8px;
+        }
+
+        .asset-failure-item {
+            padding: 10px 12px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(251, 113, 133, 0.20);
+        }
+
+        .asset-failure-item strong {
+            display: block;
+            color: #fff3f5;
+            font-size: 12px;
+            margin-bottom: 4px;
+        }
+
+        .asset-failure-item span {
+            display: block;
+            color: #ffd5dd;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .asset-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .asset-card {
+            padding: 14px;
+            border-radius: 18px;
+            background: rgba(12, 20, 38, 0.72);
+            border: 1px solid rgba(148, 163, 184, 0.12);
+        }
+
+        .asset-card-preview {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 168px;
+            padding: 10px;
+            border-radius: 14px;
+            border: 1px solid rgba(148, 163, 184, 0.10);
+            background: rgba(4, 10, 22, 0.82);
+            overflow: hidden;
+        }
+
+        .asset-card-preview img {
+            display: block;
+            max-width: 100%;
+            max-height: 220px;
+            object-fit: contain;
+            border-radius: 10px;
+            background: #ffffff;
+        }
+
+        .asset-card-placeholder {
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.7;
+            text-align: center;
+        }
+
+        .asset-card-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: start;
+            margin-top: 12px;
+        }
+
+        .asset-card-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #f8fbff;
+            line-height: 1.5;
+        }
+
+        .asset-card-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            background: rgba(255, 255, 255, 0.03);
+            color: #d8f3ff;
+            white-space: nowrap;
+        }
+
+        .asset-card-status.success {
+            border-color: rgba(52, 211, 153, 0.30);
+            background: rgba(52, 211, 153, 0.12);
+            color: #baf7dc;
+        }
+
+        .asset-card-status.warning {
+            border-color: rgba(250, 204, 21, 0.28);
+            background: rgba(250, 204, 21, 0.12);
+            color: #fde68a;
+        }
+
+        .asset-card-status.error {
+            border-color: rgba(251, 113, 133, 0.30);
+            background: rgba(251, 113, 133, 0.12);
+            color: #ffd5dd;
+        }
+
+        .asset-card-meta {
+            margin-top: 8px;
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.7;
+        }
+
+        .asset-card-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .asset-plan-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            background: rgba(255, 255, 255, 0.03);
+            color: #d8f3ff;
+            font-size: 12px;
+        }
+
+        .asset-plan-tag.candidate {
+            border-color: rgba(56, 189, 248, 0.28);
+            background: rgba(56, 189, 248, 0.12);
+            color: #d8f3ff;
+        }
+
+        .asset-plan-tag.selected {
+            border-color: rgba(52, 211, 153, 0.30);
+            background: rgba(52, 211, 153, 0.12);
+            color: #baf7dc;
+        }
+
+        .asset-card-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+
+        .asset-card details {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(148, 163, 184, 0.10);
+        }
+
+        .asset-card details summary {
+            cursor: pointer;
+            color: #d8f3ff;
+            font-size: 12px;
+        }
+
+        .asset-card-detail {
+            margin-top: 10px;
+            display: grid;
+            gap: 8px;
+        }
+
+        .asset-card-detail pre {
+            margin: 0;
+            padding: 10px 12px;
+            border-radius: 12px;
+            background: rgba(4, 10, 22, 0.82);
+            border: 1px solid rgba(148, 163, 184, 0.10);
+            color: #dbeafe;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .focused-preview-grid {
+            display: grid;
+            grid-template-columns: 320px minmax(0, 1fr);
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .focused-preview-sidebar {
+            display: grid;
+            gap: 14px;
+            align-content: start;
+        }
+
+        .focused-preview-stage {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(56, 189, 248, 0.20);
+            background: rgba(56, 189, 248, 0.08);
+            color: #d8f3ff;
+            font-size: 12px;
+        }
+
+        .focused-preview-frame-wrap {
+            padding: 12px;
+            border-radius: 18px;
+            border: 1px solid rgba(148, 163, 184, 0.12);
+            background: rgba(4, 10, 22, 0.82);
+        }
+
+        .focused-preview-frame-wrap iframe {
+            display: none;
+            width: 100%;
+            min-height: 720px;
+            border: none;
+            border-radius: 14px;
+            background: #ffffff;
+        }
+
+        .focused-preview-frame-wrap.ready iframe {
+            display: block;
+        }
+
+        .focused-preview-frame-wrap.ready .workspace-placeholder {
+            display: none;
+        }
+
+        .focused-preview-slide-list {
+            display: grid;
+            gap: 8px;
+            max-height: 420px;
+            overflow: auto;
+            padding-right: 4px;
+        }
+
+        .focused-preview-slide-item {
+            padding: 10px 12px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(148, 163, 184, 0.10);
+        }
+
+        .focused-preview-slide-item strong {
+            display: block;
+            font-size: 12px;
+            color: #f8fbff;
+            margin-bottom: 4px;
+        }
+
+        .focused-preview-slide-item.error {
+            border-color: rgba(251, 113, 133, 0.30);
+            background: rgba(251, 113, 133, 0.08);
+        }
+
+        .focused-preview-slide-meta {
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .workspace-card.active {
+            border-color: rgba(56, 189, 248, 0.26);
+            box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.14);
+        }
+
+        .workspace-summary-strip {
+            margin-top: 14px;
+            padding: 12px 14px;
+            border-radius: 14px;
+            border: 1px solid rgba(148, 163, 184, 0.10);
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.7;
+        }
+
+        .workspace-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+            margin-top: 18px;
+        }
+
+        .workspace-card {
+            padding: 18px;
+            border-radius: 18px;
+            background: rgba(12, 20, 38, 0.72);
+            border: 1px solid rgba(148, 163, 184, 0.12);
+        }
+
+        .workspace-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: start;
+        }
+
+        .workspace-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #f8fbff;
+        }
+
+        .workspace-meta-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 14px;
+        }
+
+        .workspace-meta-item {
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: rgba(4, 10, 22, 0.42);
+            border: 1px solid rgba(148, 163, 184, 0.10);
+        }
+
+        .workspace-meta-item strong {
+            display: block;
+            margin-bottom: 6px;
+            color: #f8fbff;
+            font-size: 12px;
+        }
+
+        .workspace-meta-item span {
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.6;
+            word-break: break-word;
+        }
+
+        .project-chip,
+        .project-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            background: rgba(255, 255, 255, 0.03);
+            color: #d8f3ff;
+            font-size: 12px;
+        }
+
+        .project-chip.success {
+            border-color: rgba(52, 211, 153, 0.3);
+            background: rgba(52, 211, 153, 0.12);
+            color: #baf7dc;
+        }
+
+        .project-chip.warning {
+            border-color: rgba(250, 204, 21, 0.28);
+            background: rgba(250, 204, 21, 0.12);
+            color: #fde68a;
+        }
+
+        .project-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .workspace-preview,
+        .workspace-placeholder,
+        .project-message {
+            margin-top: 14px;
+            padding: 14px 16px;
+            border-radius: 16px;
+            border: 1px solid rgba(148, 163, 184, 0.12);
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .workspace-placeholder,
+        .project-message {
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .workspace-preview {
+            padding: 10px;
+            background: rgba(4, 10, 22, 0.82);
+        }
+
+        .workspace-preview iframe {
+            width: 100%;
+            min-height: 420px;
+            border: none;
+            border-radius: 12px;
+            background: #ffffff;
+        }
+
+        .project-message {
+            display: none;
+        }
+
+        .project-message.show {
+            display: block;
+        }
+
+        .project-message.success {
+            border-color: rgba(52, 211, 153, 0.30);
+            background: rgba(52, 211, 153, 0.10);
+            color: #baf7dc;
+        }
+
+        .project-message.error {
+            border-color: rgba(251, 113, 133, 0.30);
+            background: rgba(251, 113, 133, 0.10);
+            color: #ffd5dd;
+        }
+
         .empty {
             text-align: center;
             color: var(--muted);
@@ -726,6 +1373,19 @@
             .tool-layout {
                 grid-template-columns: 1fr;
             }
+
+            .project-summary-grid,
+            .project-filter-grid,
+            .asset-filter-grid,
+            .focused-preview-grid,
+            .workspace-grid,
+            .workspace-meta-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .asset-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
         }
 
         @media (max-width: 680px) {
@@ -733,11 +1393,33 @@
                 padding-inline: 14px;
             }
 
-            .tabs,
-            .row,
             .tool-inline,
             .config-grid,
-            .detail-grid {
+            .detail-grid,
+            .project-summary-grid,
+            .project-filter-grid,
+            .asset-filter-grid,
+            .focused-preview-grid,
+            .workspace-grid,
+            .workspace-meta-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .panel-head {
+                flex-direction: column;
+            }
+
+            .asset-failure-head,
+            .asset-card-head {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .panel-head-note {
+                text-align: left;
+            }
+
+            .asset-grid {
                 grid-template-columns: 1fr;
             }
         }
@@ -773,172 +1455,228 @@
         </section>
 
         <section class="layout">
-            <div class="panel">
-                <h2>一键生成</h2>
-                <p class="subtle">选择输入方式后，系统会自动创建项目、处理素材，并直接生成可下载的 PPTX。</p>
-
-                <div class="tabs">
-                    <button class="tab active" data-tab="tab-file" onclick="switchTab('tab-file')">上传文件</button>
-                    <button class="tab" data-tab="tab-url" onclick="switchTab('tab-url')">网页链接</button>
-                    <button class="tab" data-tab="tab-text" onclick="switchTab('tab-text')">直接粘贴</button>
+            <div class="panel panel-span-full">
+                <div class="panel-head">
+                    <div>
+                        <h2>项目工作台</h2>
+                        <p class="subtle">这里可以筛选项目、打开多个工作区卡片，并把多个 Live Preview 同时嵌在同一页。</p>
+                    </div>
+                    <div class="project-toolbar">
+                        <button class="btn btn-ghost btn-small" type="button" id="refreshProjectsButton">刷新项目</button>
+                        <button class="btn btn-ghost btn-small" type="button" id="clearOpenProjectsButton">清空已打开</button>
+                    </div>
                 </div>
 
-                <div id="tab-file" class="tab-content active">
-                    <div class="dropzone" id="dropzone">
-                        <input type="file" id="fileInput" accept=".pdf,.docx,.doc,.pptx,.ppt,.xlsx,.xlsm,.xls,.epub,.html,.htm,.md,.markdown,.txt,.csv,.tsv,.odt,.rtf,.tex,.rst">
-                        <div style="font-size:36px">⬆</div>
-                        <div>拖拽文件到这里，或<strong>点击选择</strong></div>
-                        <div class="drop-hint">支持 PDF / DOCX / PPTX / Excel / Markdown / TXT / CSV 等</div>
+                <div class="project-summary-grid">
+                    <div class="project-stat"><strong id="totalProjects">0</strong><span>项目总数</span></div>
+                    <div class="project-stat"><strong id="filteredProjects">0</strong><span>筛选结果</span></div>
+                    <div class="project-stat"><strong id="activePreviews">0</strong><span>运行中预览</span></div>
+                    <div class="project-stat"><strong id="openProjectsCount">0</strong><span>已打开工作区</span></div>
+                </div>
+
+                <div class="project-filter-grid">
+                    <div>
+                        <label for="keywordFilter">关键词</label>
+                        <input id="keywordFilter" type="text" placeholder="项目名 / 路径 / 源文件名">
                     </div>
-                    <div class="selected-file" id="selectedFile">
-                        <span>📎</span>
-                        <span class="filename" id="selectedFileName"></span>
-                        <span id="selectedFileSize"></span>
-                        <button type="button" onclick="clearFile()">×</button>
+                    <div>
+                        <label for="canvasFilter">画布</label>
+                        <select id="canvasFilter"><option value="">全部</option></select>
                     </div>
-
-                    <label for="fileProjectName">项目名称</label>
-                    <input type="text" id="fileProjectName" placeholder="默认使用文件名">
-
-                    <label for="fileCanvas">画布格式</label>
-                    <select id="fileCanvas">
-                        <option value="ppt169" selected>PPT 16:9</option>
-                        <option value="ppt43">PPT 4:3</option>
-                        <option value="xhs">小红书 3:4</option>
-                        <option value="story">Story 9:16</option>
-                    </select>
-
-                    <div class="conditional-control" id="filePdfParserWrap">
-                        <label for="filePdfParser" style="margin-top:0;">PDF 解析器</label>
-                        <select id="filePdfParser">
-                            <option value="mineru" selected>MinerU 云解析（默认）</option>
-                            <option value="local">本地解析</option>
+                    <div>
+                        <label for="sourceTypeFilter">源文件类型</label>
+                        <select id="sourceTypeFilter"><option value="">全部</option></select>
+                    </div>
+                    <div>
+                        <label for="exportFilter">导出状态</label>
+                        <select id="exportFilter">
+                            <option value="">全部</option>
+                            <option value="with">有导出</option>
+                            <option value="without">无导出</option>
                         </select>
-                        <div class="field-hint">默认使用 MinerU 云解析：系统会先把 PDF 上传到 MinerU 云端解析，再把返回的原文 Markdown 和图片用于本地 PPT 生成。</div>
                     </div>
-
-                    <div class="button-row">
-                        <button class="btn btn-primary" id="fileSubmit" onclick="generateFromFile()" disabled>生成 PPT</button>
+                    <div>
+                        <label for="previewFilter">预览状态</label>
+                        <select id="previewFilter">
+                            <option value="">全部</option>
+                            <option value="running">预览运行中</option>
+                            <option value="stopped">预览未运行</option>
+                        </select>
                     </div>
-                </div>
-
-                <div id="tab-url" class="tab-content">
-                    <label for="urlInput">网页地址</label>
-                    <input type="text" id="urlInput" placeholder="https://example.com/article">
-
-                    <label for="urlProjectName">项目名称</label>
-                    <input type="text" id="urlProjectName" placeholder="默认使用域名">
-
-                    <label for="urlCanvas">画布格式</label>
-                    <select id="urlCanvas">
-                        <option value="ppt169" selected>PPT 16:9</option>
-                        <option value="ppt43">PPT 4:3</option>
-                        <option value="xhs">小红书 3:4</option>
-                        <option value="story">Story 9:16</option>
-                    </select>
-
-                    <div class="button-row">
-                        <button class="btn btn-primary" id="urlSubmit" onclick="generateFromUrl()">生成 PPT</button>
+                    <div>
+                        <label for="updatedFilter">最近更新</label>
+                        <select id="updatedFilter">
+                            <option value="">全部</option>
+                            <option value="7">7 天内</option>
+                            <option value="30">30 天内</option>
+                            <option value="90">90 天内</option>
+                        </select>
                     </div>
-                </div>
-
-                <div id="tab-text" class="tab-content">
-                    <label for="textInput">正文内容</label>
-                    <textarea id="textInput" placeholder="# 标题&#10;&#10;## 第一部分&#10;- 要点一&#10;- 要点二&#10;&#10;## 第二部分&#10;这里可以直接粘贴 Markdown 或普通文本。"></textarea>
-
-                    <div class="row">
-                        <div>
-                            <label for="textProjectName">项目名称</label>
-                            <input type="text" id="textProjectName" placeholder="text_presentation">
-                        </div>
-                        <div>
-                            <label for="textCanvas">画布格式</label>
-                            <select id="textCanvas">
-                                <option value="ppt169" selected>PPT 16:9</option>
-                                <option value="ppt43">PPT 4:3</option>
-                                <option value="xhs">小红书 3:4</option>
-                                <option value="story">Story 9:16</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="button-row">
-                        <button class="btn btn-primary" id="textSubmit" onclick="generateFromText()">生成 PPT</button>
+                    <div>
+                        <label for="createdFilter">创建时间</label>
+                        <select id="createdFilter">
+                            <option value="">全部</option>
+                            <option value="7">7 天内</option>
+                            <option value="30">30 天内</option>
+                            <option value="90">90 天内</option>
+                        </select>
                     </div>
                 </div>
 
-                <div class="progress" id="progressBox"></div>
+                <div class="small-hint project-summary-line" id="projectSummary">正在加载项目列表…</div>
+                <div class="project-list" id="projectList">
+                    <div class="empty">正在加载项目列表…</div>
+                </div>
+            </div>
+        </section>
 
-                <div class="result" id="resultBox">
-                    <h3 id="resultTitle">PPT 已生成</h3>
-                    <p id="resultMeta"></p>
-                    <p id="resultModel"></p>
-                    <p id="resultGrounding"></p>
-                    <div class="button-row" style="margin-top:12px">
-                        <a class="btn btn-primary" id="downloadLink" href="#" target="_blank" rel="noopener">下载 PPTX</a>
+        <section class="panel operation-panel" id="operationResultPanel">
+            <div class="progress" id="progressBox"></div>
+
+            <div class="result" id="resultBox">
+                <h3 id="resultTitle">PPT 已生成</h3>
+                <p id="resultMeta"></p>
+                <div class="button-row" style="margin-top:12px">
+                    <a class="btn btn-primary" id="downloadLink" href="#" target="_blank" rel="noopener">下载 PPTX</a>
+                </div>
+                <div class="artifact-links" id="resultArtifacts"></div>
+            </div>
+
+            <div class="preview" id="previewBox">
+                <h2 style="font-size:15px; margin-bottom:10px;">素材预览</h2>
+                <pre id="previewText"></pre>
+            </div>
+
+            <div class="preview" id="runDetailBox">
+                <div class="detail-grid">
+                    <div class="detail-card">
+                        <h3>本次模型与上下文配置</h3>
+                        <div class="detail-list" id="configList"></div>
                     </div>
-                    <div class="artifact-links" id="resultArtifacts"></div>
-                </div>
-
-                <div class="preview" id="previewBox">
-                    <h2 style="font-size:15px; margin-bottom:10px;">素材预览</h2>
-                    <pre id="previewText"></pre>
-                </div>
-
-                <div class="preview" id="runDetailBox">
-                    <div class="detail-grid">
-                        <div class="detail-card">
-                            <h3>本次模型与上下文配置</h3>
-                            <div class="detail-list" id="configList"></div>
-                        </div>
-                        <div class="detail-card">
-                            <h3>文件位置与中间产物</h3>
-                            <div class="detail-list" id="pathList"></div>
-                        </div>
+                    <div class="detail-card">
+                        <h3>文件位置与中间产物</h3>
+                        <div class="detail-list" id="pathList"></div>
                     </div>
-                </div>
-
-                <div class="preview" id="imageBox">
-                    <h2 style="font-size:15px; margin-bottom:10px;">源图片尺寸摘要</h2>
-                    <div class="small-hint" id="imageSummary"></div>
-                    <div class="detail-list" id="imageList"></div>
-                </div>
-
-                <div class="preview" id="logBox">
-                    <h2 style="font-size:15px; margin-bottom:10px;">运行日志</h2>
-                    <div class="log-list" id="logList"></div>
                 </div>
             </div>
 
-            <div class="panel">
-                <h2>本地项目</h2>
-                <p class="subtle">已有项目可以直接重新生成基础版 PPT，无需重新上传素材。</p>
-                <div class="project-list" id="projectList">
-                    {% if projects %}
-                        {% for project in projects %}
-                        <div class="project-item">
-                            <div class="project-head">
-                                <div>
-                                    <div class="project-name">{{ project.name }}</div>
-                                    <div class="project-meta">{{ project.source_count }} 个素材{% if project.exports %} · {{ project.exports|length }} 个导出{% endif %}</div>
-                                </div>
+            <div class="preview" id="imageBox">
+                <h2 style="font-size:15px; margin-bottom:10px;">源图片尺寸摘要</h2>
+                <div class="small-hint" id="imageSummary"></div>
+                <div class="detail-list" id="imageList"></div>
+            </div>
+
+            <div class="preview" id="assetMatchBox">
+                <h2 style="font-size:15px; margin-bottom:10px;">图文匹配诊断</h2>
+                <div class="small-hint" id="assetMatchSummary"></div>
+                <div class="artifact-links" id="assetMatchLinks"></div>
+                <div class="detail-list" id="assetMatchList"></div>
+            </div>
+
+            <div class="preview" id="logBox">
+                <h2 style="font-size:15px; margin-bottom:10px;">运行日志</h2>
+                <div class="log-list" id="logList"></div>
+            </div>
+        </section>
+
+        <section class="panel workspace-panel">
+            <div class="panel-head">
+                <div>
+                    <h2>已打开项目工作区</h2>
+                    <p class="subtle">从上面的列表打开任意数量的 project。主页面保留项目控制卡片，同时把当前关注的 Live Preview 收进一个聚焦面板，减少独立 iframe 页面感。</p>
+                </div>
+                <div class="panel-head-note" id="workspaceSummary">当前未打开任何项目。</div>
+            </div>
+            <div class="focused-preview-shell" id="focusedPreviewShell">
+                <div class="focused-preview-empty" id="focusedPreviewEmpty">当前没有聚焦中的预览。打开项目到工作区后，点击“聚焦预览”即可把对应 project 的 Live Preview 收进主页面；多个 project 仍可同时保持运行。</div>
+                <div class="focused-preview-content" id="focusedPreviewContent">
+                    <div class="panel-head">
+                        <div>
+                            <div class="workspace-title" id="focusedPreviewTitle">未选择项目</div>
+                            <div class="project-meta" id="focusedPreviewMeta"></div>
+                        </div>
+                        <div class="project-actions">
+                            <button class="btn btn-ghost btn-small" type="button" id="focusedPreviewRefreshButton">刷新预览状态</button>
+                            <a class="btn btn-ghost btn-small" id="focusedPreviewPopoutLink" href="#" target="_blank" rel="noopener">弹出预览</a>
+                        </div>
+                    </div>
+                    <div class="focused-preview-grid">
+                        <div class="focused-preview-sidebar">
+                            <div class="detail-card">
+                                <h3>预览状态</h3>
+                                <div class="focused-preview-stage" id="focusedPreviewStage">等待选择项目</div>
+                                <div class="detail-list" id="focusedPreviewMetrics"></div>
                             </div>
-                            <div class="project-actions">
-                                <button class="btn btn-ghost btn-small" onclick="regenerateProject('{{ project.name }}')">重新生成</button>
-                                {% if project.live_preview_url %}
-                                <a class="btn btn-ghost btn-small" href="{{ project.live_preview_url }}" target="_blank" rel="noopener">打开预览</a>
-                                {% endif %}
-                                {% if project.latest_export %}
-                                <a class="btn btn-ghost btn-small" href="/api/projects/{{ project.name }}/exports/{{ project.latest_export }}">下载最新</a>
-                                {% endif %}
-                                <button class="btn btn-ghost btn-small btn-danger" onclick="deleteProject('{{ project.name }}', this)">删除项目</button>
+                            <div class="detail-card">
+                                <h3>幻灯片清单</h3>
+                                <div class="focused-preview-slide-list" id="focusedPreviewSlides"></div>
                             </div>
                         </div>
-                        {% endfor %}
-                    {% else %}
-                        <div class="empty">还没有本地项目，先在左侧上传素材。</div>
-                    {% endif %}
+                        <div class="focused-preview-frame-wrap" id="focusedPreviewFrameWrap">
+                            <div class="workspace-placeholder" id="focusedPreviewPlaceholder">当前项目的 Live Preview 未运行。点击项目卡片里的“启动预览”后，这里会直接显示编辑器。</div>
+                            <iframe id="focusedPreviewFrame" title="Focused Live Preview" loading="lazy"></iframe>
+                        </div>
+                    </div>
                 </div>
+            </div>
+            <div class="focused-asset-shell" id="focusedAssetShell">
+                <div class="focused-preview-empty" id="focusedAssetEmpty">当前没有聚焦中的项目素材。把项目打开到工作区后，点击“查看素材”即可在这里查看解析出的图片、公式和渲染状态。</div>
+                <div class="focused-asset-content" id="focusedAssetContent">
+                    <div class="panel-head">
+                        <div>
+                            <div class="workspace-title" id="focusedAssetTitle">未选择项目</div>
+                            <div class="project-meta" id="focusedAssetMeta"></div>
+                        </div>
+                        <div class="project-actions">
+                            <button class="btn btn-ghost btn-small" type="button" id="focusedAssetRefreshButton">刷新素材索引</button>
+                            <a class="btn btn-ghost btn-small" id="focusedAssetReportJsonLink" href="#" target="_blank" rel="noopener" style="display:none;">渲染报告 JSON</a>
+                            <a class="btn btn-ghost btn-small" id="focusedAssetReportMdLink" href="#" target="_blank" rel="noopener" style="display:none;">渲染报告 Markdown</a>
+                        </div>
+                    </div>
+                    <div class="asset-summary-strip" id="focusedAssetSummaryStrip">等待加载项目素材索引。</div>
+                    <div class="asset-filter-grid">
+                        <div>
+                            <label for="assetKeywordFilterInput">关键词</label>
+                            <input id="assetKeywordFilterInput" type="text" placeholder="素材标题 / 标签 / 公式 / 来源文件">
+                        </div>
+                        <div>
+                            <label for="assetTypeFilterSelect">类型</label>
+                            <select id="assetTypeFilterSelect">
+                                <option value="all">全部</option>
+                                <option value="image">图片</option>
+                                <option value="formula">公式</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="assetStatusFilterSelect">状态</label>
+                            <select id="assetStatusFilterSelect">
+                                <option value="all">全部</option>
+                                <option value="rendered">已就绪</option>
+                                <option value="pending">待渲染</option>
+                                <option value="failed">渲染失败</option>
+                                <option value="missing">文件缺失</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="assetSourceFilterSelect">来源文件</label>
+                            <select id="assetSourceFilterSelect"><option value="">全部</option></select>
+                        </div>
+                    </div>
+                    <div class="asset-tab-row">
+                        <button class="btn btn-ghost btn-small active" type="button" id="assetTabAllButton" onclick="setAssetTab('all')">全部</button>
+                        <button class="btn btn-ghost btn-small" type="button" id="assetTabImageButton" onclick="setAssetTab('images')">图片</button>
+                        <button class="btn btn-ghost btn-small" type="button" id="assetTabFormulaButton" onclick="setAssetTab('formulas')">公式</button>
+                        <button class="btn btn-ghost btn-small" type="button" id="assetTabFailedButton" onclick="setAssetTab('failed')">失败公式</button>
+                    </div>
+                    <div class="asset-failure-box" id="focusedAssetFailureBox"></div>
+                    <div class="asset-grid" id="focusedAssetGrid">
+                        <div class="empty">等待加载项目素材索引。</div>
+                    </div>
+                </div>
+            </div>
+            <div class="project-message" id="projectMessage"></div>
+            <div class="workspace-grid" id="openProjectWorkspace">
+                <div class="empty">从上面的项目列表中点击“打开到工作区”即可同时管理多个 project。</div>
             </div>
         </section>
 
@@ -1039,79 +1777,39 @@
     </div>
 
     <script>
-        let selectedFile = null;
         let toolboxCatalog = null;
-        const dropzone = document.getElementById('dropzone');
-        const fileInput = document.getElementById('fileInput');
+        const PROJECT_WORKSPACE_STORAGE_KEY = 'ppt-master-open-projects';
+        const projectState = {
+            projects: [],
+            filteredProjects: [],
+            openProjects: loadStoredOpenProjects(),
+            busyActions: new Set(),
+            previewStates: {},
+            assetPanels: {},
+            focusedProjectName: '',
+        };
+        const projectFilters = {
+            keyword: document.getElementById('keywordFilter'),
+            canvas: document.getElementById('canvasFilter'),
+            sourceType: document.getElementById('sourceTypeFilter'),
+            exportState: document.getElementById('exportFilter'),
+            previewState: document.getElementById('previewFilter'),
+            updatedWithin: document.getElementById('updatedFilter'),
+            createdWithin: document.getElementById('createdFilter'),
+        };
+        const operationResultPanel = document.getElementById('operationResultPanel');
 
-        fileInput.addEventListener('change', (event) => {
-            if (event.target.files.length) {
-                selectFile(event.target.files[0]);
-            }
-        });
-
-        dropzone.addEventListener('dragover', (event) => {
-            event.preventDefault();
-            dropzone.classList.add('drag-over');
-        });
-
-        dropzone.addEventListener('dragleave', () => {
-            dropzone.classList.remove('drag-over');
-        });
-
-        dropzone.addEventListener('drop', (event) => {
-            event.preventDefault();
-            dropzone.classList.remove('drag-over');
-            if (event.dataTransfer.files.length) {
-                selectFile(event.dataTransfer.files[0]);
-            }
-        });
-
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab').forEach((tab) => tab.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach((content) => content.classList.remove('active'));
-            document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
-            document.getElementById(tabId).classList.add('active');
+        function showOperationResultPanel() {
+            operationResultPanel?.classList.add('active');
         }
 
-        function selectFile(file) {
-            selectedFile = file;
-            document.getElementById('selectedFileName').textContent = file.name;
-            document.getElementById('selectedFileSize').textContent = formatSize(file.size);
-            document.getElementById('selectedFile').classList.add('show');
-            document.getElementById('fileSubmit').disabled = false;
-            updateFileParserVisibility();
-        }
-
-        function clearFile() {
-            selectedFile = null;
-            fileInput.value = '';
-            document.getElementById('selectedFile').classList.remove('show');
-            document.getElementById('fileSubmit').disabled = true;
-            updateFileParserVisibility();
-        }
-
-        function updateFileParserVisibility() {
-            const wrap = document.getElementById('filePdfParserWrap');
-            const select = document.getElementById('filePdfParser');
-            const isPdf = selectedFile && selectedFile.name.toLowerCase().endsWith('.pdf');
-            wrap.classList.toggle('show', Boolean(isPdf));
-            if (!isPdf) {
-                // Keep the user's current preference; default remains MinerU.
-                if (!select.value) {
-                    select.value = 'mineru';
-                }
-            }
-        }
-
-        function formatSize(bytes) {
-            if (bytes < 1024) return `${bytes} B`;
-            if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-            return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+        function hideOperationResultPanel() {
+            operationResultPanel?.classList.remove('active');
         }
 
         function renderProgress(steps) {
             const progress = document.getElementById('progressBox');
+            showOperationResultPanel();
             progress.classList.add('show');
             progress.innerHTML = steps.map((step) => `
                 <div class="step">
@@ -1132,10 +1830,12 @@
         }
 
         function escapeHtml(value) {
-            return String(value)
+            return String(value ?? '')
                 .replace(/&/g, '&amp;')
                 .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;');
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
         }
 
         function setBusy(button, busyText) {
@@ -1155,38 +1855,1062 @@
             document.getElementById('progressBox').classList.remove('show');
             document.getElementById('runDetailBox').classList.remove('show');
             document.getElementById('imageBox').classList.remove('show');
+            document.getElementById('assetMatchBox').classList.remove('show');
             document.getElementById('logBox').classList.remove('show');
+            hideOperationResultPanel();
         }
 
         function hasValue(value) {
             return value !== null && value !== undefined && String(value).trim() !== '';
         }
 
-        function renderProjectList(projects) {
-            const list = document.getElementById('projectList');
-            setToolProjects(projects);
-            if (!projects.length) {
-                list.innerHTML = '<div class="empty">还没有本地项目，先在左侧上传素材。</div>';
+        function loadStoredOpenProjects() {
+            try {
+                const raw = JSON.parse(localStorage.getItem(PROJECT_WORKSPACE_STORAGE_KEY) || '[]');
+                if (!Array.isArray(raw)) {
+                    return [];
+                }
+                return raw.filter((item, index) => typeof item === 'string' && item.trim() && raw.indexOf(item) === index);
+            } catch (error) {
+                return [];
+            }
+        }
+
+        function saveOpenProjects() {
+            try {
+                localStorage.setItem(PROJECT_WORKSPACE_STORAGE_KEY, JSON.stringify(projectState.openProjects));
+            } catch (error) {
+                console.warn('无法保存已打开项目状态', error);
+            }
+        }
+
+        function emptyPreviewState(projectName) {
+            const project = projectState.projects.find((item) => item.name === projectName);
+            return {
+                success: true,
+                project_name: projectName,
+                running: Boolean(project?.has_preview),
+                live_preview_url: project?.live_preview_url || '',
+                port: project?.live_preview_port || null,
+                config: {},
+                progress: {},
+                slides: [],
+                preview_error: '',
+            };
+        }
+
+        function previewStateForProject(projectName) {
+            return projectState.previewStates[projectName] || emptyPreviewState(projectName);
+        }
+
+        function emptyAssetPanelState(projectName) {
+            return {
+                success: true,
+                project_name: projectName,
+                loading: false,
+                loaded: false,
+                loadedAt: '',
+                error: '',
+                summary: {
+                    asset_count: 0,
+                    image_count: 0,
+                    formula_count: 0,
+                    formula_rendered_count: 0,
+                    formula_failed_count: 0,
+                    formula_pending_count: 0,
+                    formula_missing_count: 0,
+                    report_ready: false,
+                    last_asset_refresh_at: '',
+                },
+                reports: {},
+                formula_report: {
+                    summary: {
+                        total: 0,
+                        rendered: 0,
+                        failed: 0,
+                        pending: 0,
+                        missing: 0,
+                    },
+                    failed_items: [],
+                },
+                filters: {
+                    source_files: [],
+                    tags: [],
+                    statuses: [],
+                    types: [],
+                },
+                items: [],
+                view: {
+                    type: 'all',
+                    status: 'all',
+                    sourceFile: '',
+                    keyword: '',
+                    tab: 'all',
+                },
+            };
+        }
+
+        function assetPanelState(projectName) {
+            if (!projectState.assetPanels[projectName]) {
+                projectState.assetPanels[projectName] = emptyAssetPanelState(projectName);
+            }
+            return projectState.assetPanels[projectName];
+        }
+
+        function safeDomId(value) {
+            return String(value || '').replace(/[^A-Za-z0-9_-]+/g, '-');
+        }
+
+        function assetStatusTone(status) {
+            if (status === 'rendered') return 'success';
+            if (status === 'pending') return 'warning';
+            if (status === 'failed' || status === 'missing') return 'error';
+            return '';
+        }
+
+        function assetStatusLabel(status) {
+            const labels = {
+                rendered: '已就绪',
+                pending: '待渲染',
+                failed: '渲染失败',
+                missing: '文件缺失',
+            };
+            return labels[status] || (status || '未知状态');
+        }
+
+        function assetFamilyLabel(item) {
+            if (item.asset_family === 'formula') return '公式';
+            if (item.asset_type === 'chart') return '图表';
+            if (item.asset_type === 'diagram') return '图示';
+            return '图片';
+        }
+
+        function formatAssetMeta(item) {
+            const bits = [];
+            if (item.source_file) bits.push(item.source_file);
+            if (item.section_heading) bits.push(`章节 ${item.section_heading}`);
+            if (item.width && item.height) bits.push(`${item.width} × ${item.height}px`);
+            if (item.orientation) bits.push(item.orientation === 'landscape' ? '横向' : item.orientation === 'portrait' ? '纵向' : item.orientation === 'square' ? '方形' : item.orientation);
+            return bits.join(' · ');
+        }
+
+        function ensureAssetView(projectName) {
+            const state = assetPanelState(projectName);
+            if (!state.view) {
+                state.view = emptyAssetPanelState(projectName).view;
+            }
+            return state.view;
+        }
+
+        function filteredAssetItems(assetState) {
+            const view = assetState.view || emptyAssetPanelState(assetState.project_name || '').view;
+            return (assetState.items || []).filter((item) => {
+                if (view.tab === 'images' && item.asset_family !== 'image') {
+                    return false;
+                }
+                if (view.tab === 'formulas' && item.asset_family !== 'formula') {
+                    return false;
+                }
+                if (view.tab === 'failed' && !(item.asset_family === 'formula' && ['failed', 'missing'].includes(item.status))) {
+                    return false;
+                }
+                if (view.type !== 'all' && item.asset_family !== view.type) {
+                    return false;
+                }
+                if (view.status !== 'all' && item.status !== view.status) {
+                    return false;
+                }
+                if (view.sourceFile && item.source_file !== view.sourceFile) {
+                    return false;
+                }
+                if (view.keyword) {
+                    const haystack = [
+                        item.title,
+                        item.description,
+                        item.source_file,
+                        item.context,
+                        item.latex,
+                        item.reference,
+                        item.section_heading,
+                        ...(item.tags || []),
+                    ].join(' ').toLowerCase();
+                    if (!haystack.includes(view.keyword.toLowerCase())) {
+                        return false;
+                    }
+                }
+                return true;
+            });
+        }
+
+        function assetPreviewHtml(item) {
+            if (!item.preview_url) {
+                return `<div class="asset-card-placeholder">${escapeHtml(item.error || '暂无可用预览')}</div>`;
+            }
+            return `<img src="${item.preview_url}" alt="${escapeHtml(item.title || item.id || 'asset')}" loading="lazy">`;
+        }
+
+        function renderAssetCard(item) {
+            const tagItems = item.tags || [];
+            const visibleTags = tagItems.slice(0, 4);
+            const hiddenTagCount = Math.max(tagItems.length - visibleTags.length, 0);
+            const planningTags = [];
+            if (item.selected_for_deck) {
+                planningTags.push('<span class="asset-plan-tag selected">已采用</span>');
+            } else if (item.candidate_material) {
+                planningTags.push('<span class="asset-plan-tag candidate">候选素材</span>');
+            }
+            const detailRows = [];
+            if (item.description) detailRows.push(`<div class="detail-item"><span class="detail-label">描述</span><div class="detail-value">${escapeHtml(item.description)}</div></div>`);
+            if (item.context) detailRows.push(`<div class="detail-item"><span class="detail-label">上下文</span><div class="detail-value">${escapeHtml(item.context)}</div></div>`);
+            if (item.latex) detailRows.push(`<pre>${escapeHtml(item.latex)}</pre>`);
+            if (item.error) detailRows.push(`<pre>${escapeHtml(item.error)}</pre>`);
+            if (item.reference) detailRows.push(`<div class="detail-item"><span class="detail-label">引用</span><div class="detail-value">${escapeHtml(item.reference)}</div></div>`);
+            if (item.provider || item.purpose || item.search_query) {
+                detailRows.push(`
+                    <div class="detail-item">
+                        <span class="detail-label">来源补充</span>
+                        <div class="detail-value">${escapeHtml([item.provider, item.purpose, item.search_query].filter(Boolean).join(' · '))}</div>
+                    </div>
+                `);
+            }
+            return `
+                <article class="asset-card" id="asset-${safeDomId(item.id || item.relative_path || item.title)}">
+                    <div class="asset-card-preview">${assetPreviewHtml(item)}</div>
+                    <div class="asset-card-head">
+                        <div>
+                            <div class="asset-card-title">${escapeHtml(item.title || item.id || '未命名素材')}</div>
+                            <div class="asset-card-meta">${escapeHtml(assetFamilyLabel(item))}${formatAssetMeta(item) ? ` · ${escapeHtml(formatAssetMeta(item))}` : ''}</div>
+                        </div>
+                        <span class="asset-card-status ${assetStatusTone(item.status)}">${escapeHtml(assetStatusLabel(item.status))}</span>
+                    </div>
+                    ${(planningTags.length || visibleTags.length || hiddenTagCount) ? `
+                        <div class="asset-card-tags">
+                            ${planningTags.join('')}
+                            ${visibleTags.map((tag) => `<span class="project-tag">${escapeHtml(tag)}</span>`).join('')}
+                            ${hiddenTagCount ? `<span class="project-tag">+${hiddenTagCount}</span>` : ''}
+                        </div>
+                    ` : ''}
+                    <div class="asset-card-actions">
+                        ${item.preview_url ? `<a class="btn btn-ghost btn-small" href="${item.preview_url}" target="_blank" rel="noopener">打开文件</a>` : ''}
+                        ${item.download_url && item.download_url !== item.preview_url ? `<a class="btn btn-ghost btn-small" href="${item.download_url}" target="_blank" rel="noopener">下载</a>` : ''}
+                    </div>
+                    ${detailRows.length ? `
+                        <details>
+                            <summary>查看详情</summary>
+                            <div class="asset-card-detail">${detailRows.join('')}</div>
+                        </details>
+                    ` : ''}
+                </article>
+            `;
+        }
+
+        function renderAssetFailureSummary(assetState) {
+            const box = document.getElementById('focusedAssetFailureBox');
+            const report = assetState.formula_report || {};
+            const summary = report.summary || {};
+            const failedTotal = Number(summary.failed || 0) + Number(summary.missing || 0);
+            if (!(summary.total || 0) || !failedTotal) {
+                box.classList.remove('show');
+                box.innerHTML = '';
                 return;
             }
-            list.innerHTML = projects.map((project) => `
+            const failedItems = (report.failed_items || []).slice(0, 6);
+            box.innerHTML = `
+                <div class="asset-failure-head">
+                    <strong>公式共 ${escapeHtml(summary.total || 0)} 条，成功 ${escapeHtml(summary.rendered || 0)} 条，失败 ${escapeHtml(summary.failed || 0)} 条，缺失 ${escapeHtml(summary.missing || 0)} 条。</strong>
+                    <button class="btn btn-ghost btn-small" type="button" onclick="setAssetTab('failed')">只看失败公式</button>
+                </div>
+                <div class="asset-failure-list">
+                    ${failedItems.map((item) => `
+                        <div class="asset-failure-item">
+                            <strong>${escapeHtml(item.id || '未命名公式')}</strong>
+                            <span>${escapeHtml(item.latex || item.title || '')}</span>
+                            <span>${escapeHtml(item.error || item.status || '未知错误')}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            box.classList.add('show');
+        }
+
+        function syncFocusedAssetFilters(assetState) {
+            const view = assetState.view || emptyAssetPanelState(assetState.project_name || '').view;
+            const sourceSelect = document.getElementById('assetSourceFilterSelect');
+            const currentSource = view.sourceFile;
+            sourceSelect.innerHTML = '<option value="">全部</option>' + (assetState.filters?.source_files || []).map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join('');
+            if ((assetState.filters?.source_files || []).includes(currentSource)) {
+                sourceSelect.value = currentSource;
+            } else {
+                sourceSelect.value = '';
+                view.sourceFile = '';
+            }
+
+            document.getElementById('assetTypeFilterSelect').value = view.type || 'all';
+            document.getElementById('assetStatusFilterSelect').value = view.status || 'all';
+            document.getElementById('assetKeywordFilterInput').value = view.keyword || '';
+            document.getElementById('assetTabAllButton').classList.toggle('active', view.tab === 'all');
+            document.getElementById('assetTabImageButton').classList.toggle('active', view.tab === 'images');
+            document.getElementById('assetTabFormulaButton').classList.toggle('active', view.tab === 'formulas');
+            document.getElementById('assetTabFailedButton').classList.toggle('active', view.tab === 'failed');
+        }
+
+        async function loadProjectAssets(projectName, options = {}) {
+            const { quiet = false, background = false, force = false } = options;
+            const project = projectByName(projectName);
+            if (!project) {
+                return null;
+            }
+            const state = assetPanelState(projectName);
+            if (state.loading) {
+                return state;
+            }
+            if (state.loaded && !force) {
+                renderFocusedProjectAssets();
+                return state;
+            }
+
+            state.loading = true;
+            state.error = '';
+            renderFocusedProjectAssets();
+            if (!background) {
+                setProjectBusy(projectName, 'assets', true);
+            }
+
+            try {
+                const payload = await fetchJson(`/api/projects/${encodeURIComponent(projectName)}/assets`);
+                projectState.assetPanels[projectName] = {
+                    ...assetPanelState(projectName),
+                    ...payload,
+                    loading: false,
+                    loaded: true,
+                    loadedAt: new Date().toISOString(),
+                    error: '',
+                    view: ensureAssetView(projectName),
+                };
+                renderProjectBrowser();
+                renderOpenProjectWorkspace();
+                renderFocusedProjectAssets();
+                return projectState.assetPanels[projectName];
+            } catch (error) {
+                state.loading = false;
+                state.error = error.message;
+                renderFocusedProjectAssets();
+                if (!quiet) {
+                    showProjectMessage(`加载 ${projectName} 素材索引失败：${error.message}`, 'error');
+                }
+                return null;
+            } finally {
+                if (!background) {
+                    setProjectBusy(projectName, 'assets', false);
+                }
+            }
+        }
+
+        function setAssetTab(tab) {
+            if (!projectState.focusedProjectName) {
+                return;
+            }
+            const view = ensureAssetView(projectState.focusedProjectName);
+            view.tab = tab;
+            renderFocusedProjectAssets();
+        }
+
+        function updateFocusedAssetView(patch) {
+            if (!projectState.focusedProjectName) {
+                return;
+            }
+            const view = ensureAssetView(projectState.focusedProjectName);
+            Object.assign(view, patch);
+            renderFocusedProjectAssets();
+        }
+
+        function viewProjectAssets(projectName) {
+            if (!projectState.openProjects.includes(projectName)) {
+                openProjectWorkspace(projectName);
+            }
+            setFocusedProject(projectName);
+            loadProjectAssets(projectName, { quiet: true, background: true, force: false });
+            document.getElementById('focusedAssetShell')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function renderFocusedProjectAssets() {
+            const shell = document.getElementById('focusedAssetShell');
+            const title = document.getElementById('focusedAssetTitle');
+            const meta = document.getElementById('focusedAssetMeta');
+            const summaryStrip = document.getElementById('focusedAssetSummaryStrip');
+            const grid = document.getElementById('focusedAssetGrid');
+            const refreshButton = document.getElementById('focusedAssetRefreshButton');
+            const reportJsonLink = document.getElementById('focusedAssetReportJsonLink');
+            const reportMdLink = document.getElementById('focusedAssetReportMdLink');
+
+            ensureFocusedProject();
+            const project = projectByName(projectState.focusedProjectName);
+            if (!project) {
+                shell.classList.remove('active');
+                title.textContent = '未选择项目';
+                meta.textContent = '';
+                summaryStrip.textContent = '等待加载项目素材索引。';
+                grid.innerHTML = '<div class="empty">先从项目列表把一个 project 打开到工作区，再点击“查看素材”。</div>';
+                reportJsonLink.style.display = 'none';
+                reportMdLink.style.display = 'none';
+                renderAssetFailureSummary(emptyAssetPanelState(''));
+                return;
+            }
+
+            const state = assetPanelState(project.name);
+            const summary = state.summary || {};
+            shell.classList.add('active');
+            title.textContent = `${project.name} · 项目解析素材`;
+            meta.textContent = project.path || '';
+            syncFocusedAssetFilters(state);
+
+            const summaryBits = [
+                `共 ${summary.asset_count || 0} 项素材`,
+                `图片 ${summary.image_count || 0}`,
+                `公式 ${summary.formula_count || 0}`,
+                `成功 ${summary.formula_rendered_count || 0}`,
+                `失败 ${summary.formula_failed_count || 0}`,
+                `待渲染 ${summary.formula_pending_count || 0}`,
+            ];
+            if (summary.last_asset_refresh_at) {
+                summaryBits.push(`最近刷新 ${summary.last_asset_refresh_at}`);
+            }
+            if (state.error) {
+                summaryBits.push(`接口告警 ${state.error}`);
+            }
+            summaryStrip.textContent = summaryBits.join(' · ');
+
+            refreshButton.disabled = state.loading || isProjectBusy(project.name, 'assets');
+            refreshButton.textContent = state.loading || isProjectBusy(project.name, 'assets') ? '刷新中…' : '刷新素材索引';
+            refreshButton.onclick = () => loadProjectAssets(project.name, { force: true });
+
+            if (state.reports?.formula_render_report_json) {
+                reportJsonLink.href = state.reports.formula_render_report_json;
+                reportJsonLink.style.display = '';
+            } else {
+                reportJsonLink.style.display = 'none';
+            }
+            if (state.reports?.formula_render_report_md) {
+                reportMdLink.href = state.reports.formula_render_report_md;
+                reportMdLink.style.display = '';
+            } else {
+                reportMdLink.style.display = 'none';
+            }
+
+            renderAssetFailureSummary(state);
+
+            if (!state.loaded && !state.loading) {
+                grid.innerHTML = '<div class="empty">正在准备素材索引…</div>';
+                loadProjectAssets(project.name, { quiet: true, background: true, force: false });
+                return;
+            }
+            if (state.loading && !state.loaded) {
+                grid.innerHTML = Array.from({ length: 6 }, () => '<div class="asset-card"><div class="asset-card-preview"><div class="asset-card-placeholder">素材索引加载中…</div></div></div>').join('');
+                return;
+            }
+            if (state.error && !state.loaded) {
+                grid.innerHTML = `<div class="empty">素材索引加载失败：${escapeHtml(state.error)}</div>`;
+                return;
+            }
+
+            const items = filteredAssetItems(state);
+            if (!items.length) {
+                grid.innerHTML = `<div class="empty">${state.items?.length ? '当前筛选条件下没有匹配素材。' : '当前项目还没有解析素材。'}</div>`;
+                return;
+            }
+            grid.innerHTML = items.map((item) => renderAssetCard(item)).join('');
+        }
+
+        function previewStageLabel(stage, percent = null) {
+            const labels = {
+                initializing: '初始化项目',
+                preparing_sources: '准备源材料',
+                planning_deck: '规划 PPT',
+                acquiring_assets: '准备素材',
+                generating_slides: '生成页面',
+                generating_notes: '生成备注',
+                finalizing_svg: '整理 SVG',
+                exporting_pptx: '导出 PPTX',
+                completed: '导出完成',
+            };
+            const base = labels[stage] || (stage ? stage : 'Live Preview 已就绪');
+            if (typeof percent === 'number' && Number.isFinite(percent)) {
+                return `${base} · ${Math.round(percent)}%`;
+            }
+            return base;
+        }
+
+        function projectByName(projectName) {
+            return projectState.projects.find((project) => project.name === projectName) || null;
+        }
+
+        function busyKey(projectName, action) {
+            return `${projectName}:${action}`;
+        }
+
+        function isProjectBusy(projectName, action) {
+            return projectState.busyActions.has(busyKey(projectName, action));
+        }
+
+        function setProjectBusy(projectName, action, busy) {
+            const key = busyKey(projectName, action);
+            if (busy) {
+                projectState.busyActions.add(key);
+            } else {
+                projectState.busyActions.delete(key);
+            }
+            renderProjectBrowser();
+            renderOpenProjectWorkspace();
+            renderFocusedPreview();
+            renderFocusedProjectAssets();
+        }
+
+        function showProjectMessage(text, tone = 'success') {
+            const box = document.getElementById('projectMessage');
+            box.textContent = text;
+            box.className = `project-message show ${tone}`;
+        }
+
+        function clearProjectMessage() {
+            const box = document.getElementById('projectMessage');
+            box.textContent = '';
+            box.className = 'project-message';
+        }
+
+        function sortProjects(projects) {
+            return [...projects].sort((left, right) => {
+                const delta = Number(right.updated_at_ts || 0) - Number(left.updated_at_ts || 0);
+                if (delta !== 0) {
+                    return delta;
+                }
+                return left.name.localeCompare(right.name, 'zh-CN');
+            });
+        }
+
+        function ensureFocusedProject() {
+            const openNames = projectState.openProjects.filter((projectName) => Boolean(projectByName(projectName)));
+            if (projectState.focusedProjectName && openNames.includes(projectState.focusedProjectName)) {
+                return;
+            }
+            projectState.focusedProjectName = openNames[0] || '';
+        }
+
+        function setFocusedProject(projectName) {
+            if (!projectState.openProjects.includes(projectName)) {
+                return;
+            }
+            projectState.focusedProjectName = projectName;
+            renderOpenProjectWorkspace();
+            renderFocusedPreview();
+            renderFocusedProjectAssets();
+            refreshProjectPreviewState(projectName, { quiet: true, background: true });
+            loadProjectAssets(projectName, { quiet: true, background: true, force: false });
+        }
+
+        function syncProjects(projects, options = {}) {
+            projectState.projects = sortProjects(Array.isArray(projects) ? projects : []);
+            const availableNames = new Set(projectState.projects.map((project) => project.name));
+            projectState.openProjects = projectState.openProjects.filter((name) => availableNames.has(name));
+            Object.keys(projectState.previewStates).forEach((projectName) => {
+                if (!availableNames.has(projectName)) {
+                    delete projectState.previewStates[projectName];
+                }
+            });
+            Object.keys(projectState.assetPanels).forEach((projectName) => {
+                if (!availableNames.has(projectName)) {
+                    delete projectState.assetPanels[projectName];
+                }
+            });
+            if (options.autoOpenProject && availableNames.has(options.autoOpenProject) && !projectState.openProjects.includes(options.autoOpenProject)) {
+                projectState.openProjects.unshift(options.autoOpenProject);
+            }
+            if (options.autoOpenProject && availableNames.has(options.autoOpenProject)) {
+                projectState.focusedProjectName = options.autoOpenProject;
+            }
+            ensureFocusedProject();
+            saveOpenProjects();
+            updateProjectFilterOptions();
+            applyProjectFilters();
+            setToolProjects(projectState.projects);
+            refreshOpenProjectPreviewStates({ quiet: true, background: true });
+            renderFocusedProjectAssets();
+            if (projectState.focusedProjectName) {
+                loadProjectAssets(projectState.focusedProjectName, { quiet: true, background: true, force: false });
+            }
+        }
+
+        function updateProjectFilterOptions() {
+            const canvasValues = [...new Set(projectState.projects.map((project) => project.canvas_format).filter(Boolean))].sort();
+            const sourceValues = [...new Set(projectState.projects.flatMap((project) => project.source_exts || []).filter(Boolean))].sort();
+            const currentCanvas = projectFilters.canvas.value;
+            const currentSourceType = projectFilters.sourceType.value;
+
+            projectFilters.canvas.innerHTML = '<option value="">全部</option>' + canvasValues.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join('');
+            projectFilters.sourceType.innerHTML = '<option value="">全部</option>' + sourceValues.map((value) => `<option value="${escapeHtml(value)}">.${escapeHtml(value)}</option>`).join('');
+
+            if (canvasValues.includes(currentCanvas)) {
+                projectFilters.canvas.value = currentCanvas;
+            }
+            if (sourceValues.includes(currentSourceType)) {
+                projectFilters.sourceType.value = currentSourceType;
+            }
+        }
+
+        function renderProjectSummary() {
+            const total = projectState.projects.length;
+            const filtered = projectState.filteredProjects.length;
+            const openCount = projectState.openProjects.length;
+            document.getElementById('totalProjects').textContent = String(total);
+            document.getElementById('filteredProjects').textContent = String(filtered);
+            document.getElementById('activePreviews').textContent = String(projectState.projects.filter((project) => project.has_preview).length);
+            document.getElementById('openProjectsCount').textContent = String(openCount);
+            document.getElementById('projectSummary').textContent = !total
+                ? '当前没有历史项目。'
+                : filtered === total
+                    ? `当前展示全部 ${total} 个项目。`
+                    : `当前展示 ${filtered} / ${total} 个项目。`;
+        }
+
+        function applyProjectFilters() {
+            const keyword = projectFilters.keyword.value.trim().toLowerCase();
+            const canvas = projectFilters.canvas.value;
+            const sourceType = projectFilters.sourceType.value;
+            const exportState = projectFilters.exportState.value;
+            const previewState = projectFilters.previewState.value;
+            const updatedWithin = Number(projectFilters.updatedWithin.value || 0);
+            const createdWithin = Number(projectFilters.createdWithin.value || 0);
+            const updatedThreshold = updatedWithin ? Date.now() / 1000 - updatedWithin * 24 * 60 * 60 : 0;
+            const createdThreshold = createdWithin ? Date.now() / 1000 - createdWithin * 24 * 60 * 60 : 0;
+
+            projectState.filteredProjects = sortProjects(projectState.projects.filter((project) => {
+                if (keyword) {
+                    const haystack = [project.name, project.path, ...(project.source_files || [])].join(' ').toLowerCase();
+                    if (!haystack.includes(keyword)) {
+                        return false;
+                    }
+                }
+                if (canvas && project.canvas_format !== canvas) {
+                    return false;
+                }
+                if (sourceType && !(project.source_exts || []).includes(sourceType)) {
+                    return false;
+                }
+                if (exportState === 'with' && !project.has_exports) {
+                    return false;
+                }
+                if (exportState === 'without' && project.has_exports) {
+                    return false;
+                }
+                if (previewState === 'running' && !project.has_preview) {
+                    return false;
+                }
+                if (previewState === 'stopped' && project.has_preview) {
+                    return false;
+                }
+                if (updatedThreshold && Number(project.updated_at_ts || 0) < updatedThreshold) {
+                    return false;
+                }
+                if (createdThreshold && Number(project.created_at_ts || 0) < createdThreshold) {
+                    return false;
+                }
+                return true;
+            }));
+
+            renderProjectSummary();
+            renderProjectBrowser();
+            renderOpenProjectWorkspace();
+            renderFocusedPreview();
+        }
+
+        function projectBusyLabel(action, label) {
+            const labels = {
+                start: '启动中…',
+                stop: '关闭中…',
+                regenerate: '生成中…',
+                delete: '删除中…',
+                preview_state: '刷新中…',
+                assets: '刷新素材中…',
+            };
+            return labels[action] || label;
+        }
+
+        function projectActionButton(project, action, label, className, handlerName) {
+            const busy = isProjectBusy(project.name, action);
+            return `<button class="btn ${className}" type="button" ${busy ? 'disabled' : ''} onclick='${handlerName}(${JSON.stringify(project.name)})'>${busy ? projectBusyLabel(action, label) : label}</button>`;
+        }
+
+        function projectTags(project) {
+            if (!(project.source_exts || []).length) {
+                return '<span class="project-tag">无源文件</span>';
+            }
+            return (project.source_exts || []).map((ext) => `<span class="project-tag">.${escapeHtml(ext)}</span>`).join('');
+        }
+
+        function previewSummaryText(project, previewState) {
+            if (!project.has_preview && !previewState.running) {
+                return 'Preview 未运行。启动后这里会显示当前阶段、页面进度和幻灯片摘要。';
+            }
+            const progress = previewState.progress || {};
+            const slides = previewState.slides || [];
+            const bits = [previewStageLabel(progress.stage, typeof progress.percent === 'number' ? progress.percent : null)];
+            bits.push(`Slides ${progress.slides_generated || slides.length || 0} / ${progress.total_pages || '?'}`);
+            bits.push(`已载入 ${slides.length} 页`);
+            if (progress.latest_export_name || project.latest_export) {
+                bits.push(`导出 ${progress.latest_export_name || project.latest_export}`);
+            }
+            if (previewState.preview_error) {
+                bits.push(`接口告警 ${previewState.preview_error}`);
+            }
+            return bits.join(' · ');
+        }
+
+        function openProjectWorkspace(projectName) {
+            if (!projectByName(projectName) || projectState.openProjects.includes(projectName)) {
+                return;
+            }
+            projectState.openProjects.unshift(projectName);
+            if (!projectState.focusedProjectName) {
+                projectState.focusedProjectName = projectName;
+            }
+            saveOpenProjects();
+            renderProjectSummary();
+            renderProjectBrowser();
+            renderOpenProjectWorkspace();
+            renderFocusedPreview();
+            renderFocusedProjectAssets();
+            refreshProjectPreviewState(projectName, { quiet: true, background: true });
+            loadProjectAssets(projectName, { quiet: true, background: true, force: false });
+        }
+
+        function closeProjectWorkspace(projectName) {
+            projectState.openProjects = projectState.openProjects.filter((name) => name !== projectName);
+            if (projectState.focusedProjectName === projectName) {
+                projectState.focusedProjectName = '';
+            }
+            ensureFocusedProject();
+            saveOpenProjects();
+            renderProjectSummary();
+            renderProjectBrowser();
+            renderOpenProjectWorkspace();
+            renderFocusedPreview();
+            renderFocusedProjectAssets();
+        }
+
+        function clearOpenProjects() {
+            projectState.openProjects = [];
+            projectState.focusedProjectName = '';
+            saveOpenProjects();
+            renderProjectSummary();
+            renderProjectBrowser();
+            renderOpenProjectWorkspace();
+            renderFocusedPreview();
+            renderFocusedProjectAssets();
+        }
+
+        async function refreshProjectPreviewState(projectName, options = {}) {
+            const { quiet = false, background = false } = options;
+            const project = projectByName(projectName);
+            if (!project) {
+                return null;
+            }
+            if (!background) {
+                setProjectBusy(projectName, 'preview_state', true);
+            }
+            try {
+                const payload = await fetchJson(`/api/projects/${encodeURIComponent(projectName)}/preview/state`);
+                projectState.previewStates[projectName] = payload;
+                renderProjectBrowser();
+                renderOpenProjectWorkspace();
+                renderFocusedPreview();
+                return payload;
+            } catch (error) {
+                projectState.previewStates[projectName] = {
+                    ...emptyPreviewState(projectName),
+                    preview_error: error.message,
+                };
+                renderProjectBrowser();
+                renderOpenProjectWorkspace();
+                renderFocusedPreview();
+                if (!quiet) {
+                    showProjectMessage(`刷新 ${projectName} 预览状态失败：${error.message}`, 'error');
+                }
+                return null;
+            } finally {
+                if (!background) {
+                    setProjectBusy(projectName, 'preview_state', false);
+                }
+            }
+        }
+
+        function refreshOpenProjectPreviewStates(options = {}) {
+            const targets = projectState.openProjects.filter((projectName) => {
+                const project = projectByName(projectName);
+                return Boolean(project) && (project.has_preview || projectName === projectState.focusedProjectName);
+            });
+            if (!targets.length) {
+                return Promise.resolve([]);
+            }
+            return Promise.all(targets.map((projectName) => refreshProjectPreviewState(projectName, options)));
+        }
+
+        function renderProjectBrowser() {
+            const list = document.getElementById('projectList');
+            if (!projectState.filteredProjects.length) {
+                list.innerHTML = '<div class="empty">没有符合当前筛选条件的项目。</div>';
+                return;
+            }
+
+            list.innerHTML = projectState.filteredProjects.map((project) => {
+                const assetSummary = project.asset_summary || {};
+                const chips = [
+                    project.has_preview
+                        ? `<span class="project-chip success">Preview 运行中 · ${escapeHtml(project.live_preview_port || 5050)}</span>`
+                        : '<span class="project-chip warning">Preview 未运行</span>',
+                    project.has_exports
+                        ? `<span class="project-chip success">${escapeHtml(project.export_count || 0)} 个导出</span>`
+                        : '<span class="project-chip warning">暂无导出</span>',
+                    `<span class="project-chip">图片 ${escapeHtml(assetSummary.image_count || 0)}</span>`,
+                    `<span class="project-chip">公式 ${escapeHtml(assetSummary.formula_count || 0)}</span>`,
+                    `<span class="project-chip">候选 ${escapeHtml(assetSummary.candidate_material_count || 0)}</span>`,
+                    Number(assetSummary.selected_for_deck_count || 0) > 0
+                        ? `<span class="project-chip success">已采用 ${escapeHtml(assetSummary.selected_for_deck_count || 0)}</span>`
+                        : '<span class="project-chip">已采用 0</span>',
+                    Number(assetSummary.formula_failed_count || 0) > 0
+                        ? `<span class="project-chip warning">公式失败 ${escapeHtml(assetSummary.formula_failed_count || 0)}</span>`
+                        : `<span class="project-chip success">公式失败 0</span>`,
+                    projectState.openProjects.includes(project.name)
+                        ? '<span class="project-chip">已在工作区</span>'
+                        : '',
+                ].filter(Boolean).join('');
+
+                const openWorkspaceButton = projectState.openProjects.includes(project.name)
+                    ? '<span class="project-chip success">已打开到工作区</span>'
+                    : `<button class="btn btn-ghost btn-small" type="button" onclick='openProjectWorkspace(${JSON.stringify(project.name)})'>打开到工作区</button>`;
+                const previewToggleButton = project.has_preview
+                    ? projectActionButton(project, 'stop', '关闭预览', 'btn-ghost btn-small', 'stopProjectPreview')
+                    : projectActionButton(project, 'start', '启动预览', 'btn-ghost btn-small', 'startProjectPreview');
+                const previewLink = project.live_preview_url
+                    ? `<a class="btn btn-ghost btn-small" href="${escapeHtml(project.live_preview_url)}" target="_blank" rel="noopener">打开预览</a>`
+                    : '';
+                const downloadLink = project.latest_export
+                    ? `<a class="btn btn-ghost btn-small" href="/api/projects/${encodeURIComponent(project.name)}/exports/${encodeURIComponent(project.latest_export)}">下载最新</a>`
+                    : '';
+                const focusButton = projectState.openProjects.includes(project.name)
+                    ? `<button class="btn btn-ghost btn-small" type="button" onclick='setFocusedProject(${JSON.stringify(project.name)})'>${projectState.focusedProjectName === project.name ? '当前聚焦' : '聚焦预览'}</button>`
+                    : '';
+                const assetButton = `<button class="btn btn-ghost btn-small" type="button" onclick='viewProjectAssets(${JSON.stringify(project.name)})'>查看素材</button>`;
+
+                return `
                 <div class="project-item">
                     <div class="project-head">
                         <div>
                             <div class="project-name">${escapeHtml(project.name)}</div>
-                            <div class="project-meta">${project.source_count} 个素材${project.exports?.length ? ` · ${project.exports.length} 个导出` : ''}</div>
+                            <div class="project-meta">${escapeHtml(project.source_count || 0)} 个素材 · 画布 ${escapeHtml(project.canvas_format || 'ppt169')} · 创建 ${escapeHtml(project.created_at || '未知')} · 最近更新 ${escapeHtml(project.updated_at || '未知')}</div>
                             <div class="project-path">项目目录：${escapeHtml(project.path || '')}</div>
                             ${project.latest_export_path ? `<div class="project-path">最新导出：${escapeHtml(project.latest_export_path)}</div>` : ''}
+                            ${chips ? `<div class="project-tags">${chips}</div>` : ''}
+                            <div class="project-tags">${projectTags(project)}</div>
                         </div>
                     </div>
                     <div class="project-actions">
-                        <button class="btn btn-ghost btn-small" onclick="regenerateProject('${project.name.replace(/'/g, "\\'")}')">重新生成</button>
-                        ${project.live_preview_url ? `<a class="btn btn-ghost btn-small" href="${project.live_preview_url}" target="_blank" rel="noopener">打开预览</a>` : ''}
-                        ${project.latest_export ? `<a class="btn btn-ghost btn-small" href="/api/projects/${project.name}/exports/${project.latest_export}">下载最新</a>` : ''}
-                        <button class="btn btn-ghost btn-small btn-danger" onclick="deleteProject('${project.name.replace(/'/g, "\\'")}', this)">删除项目</button>
+                        ${openWorkspaceButton}
+                        ${assetButton}
+                        ${focusButton}
+                        ${previewToggleButton}
+                        ${previewLink}
+                        ${downloadLink}
+                        ${projectActionButton(project, 'regenerate', '重新生成', 'btn-ghost btn-small', 'regenerateProject')}
+                        ${projectActionButton(project, 'delete', '删除项目', 'btn-ghost btn-small btn-danger', 'deleteProject')}
                     </div>
                 </div>
+                `;
+            }).join('');
+        }
+
+        function renderFocusedPreview() {
+            const shell = document.getElementById('focusedPreviewShell');
+            const title = document.getElementById('focusedPreviewTitle');
+            const meta = document.getElementById('focusedPreviewMeta');
+            const stage = document.getElementById('focusedPreviewStage');
+            const metrics = document.getElementById('focusedPreviewMetrics');
+            const slides = document.getElementById('focusedPreviewSlides');
+            const placeholder = document.getElementById('focusedPreviewPlaceholder');
+            const frameWrap = document.getElementById('focusedPreviewFrameWrap');
+            const frame = document.getElementById('focusedPreviewFrame');
+            const popout = document.getElementById('focusedPreviewPopoutLink');
+            const refreshButton = document.getElementById('focusedPreviewRefreshButton');
+
+            ensureFocusedProject();
+            const project = projectByName(projectState.focusedProjectName);
+            if (!project) {
+                shell.classList.remove('active');
+                title.textContent = '未选择项目';
+                meta.textContent = '';
+                stage.textContent = '等待选择项目';
+                metrics.innerHTML = '';
+                slides.innerHTML = '<div class="focused-preview-slide-item"><div class="focused-preview-slide-meta">先从上方项目列表把一个 project 打开到工作区，再点击“聚焦预览”。</div></div>';
+                frameWrap.classList.remove('ready');
+                frame.removeAttribute('src');
+                frame.dataset.previewUrl = '';
+                popout.style.display = 'none';
+                refreshButton.disabled = true;
+                return;
+            }
+
+            shell.classList.add('active');
+            const previewState = previewStateForProject(project.name);
+            const progress = previewState.progress || {};
+            const slideItems = previewState.slides || [];
+            const livePreviewUrl = previewState.live_preview_url || project.live_preview_url || '';
+            const running = Boolean(previewState.running && livePreviewUrl);
+
+            title.textContent = project.name;
+            meta.textContent = project.path || '';
+            stage.textContent = running
+                ? previewStageLabel(progress.stage, typeof progress.percent === 'number' ? progress.percent : null)
+                : 'Preview 未运行';
+
+            const metricItems = [
+                ['运行地址', livePreviewUrl || '未启动'],
+                ['当前阶段', stage.textContent],
+                ['页面进度', `${progress.slides_generated || slideItems.length || 0} / ${progress.total_pages || '?'}`],
+                ['已整理 SVG', `${progress.slides_finalized || 0}`],
+                ['备注状态', progress.notes_ready ? '已生成' : '待生成'],
+                ['最新导出', progress.latest_export_name || project.latest_export || '暂无'],
+            ];
+            if (previewState.preview_error) {
+                metricItems.push(['接口告警', previewState.preview_error]);
+            }
+            metrics.innerHTML = metricItems.map(([label, value]) => `
+                <div class="detail-item">
+                    <span class="detail-label">${escapeHtml(label)}</span>
+                    <div class="detail-value">${escapeHtml(value)}</div>
+                </div>
             `).join('');
+
+            slides.innerHTML = slideItems.length
+                ? slideItems.map((slide) => {
+                    const metaParts = [];
+                    metaParts.push(`${slide.annotation_count || 0} 条标注`);
+                    if (slide.annotated) metaParts.push('已标注');
+                    if (slide.ok === false && slide.error) metaParts.push(slide.error);
+                    return `
+                        <div class="focused-preview-slide-item ${slide.ok === false ? 'error' : ''}">
+                            <strong>${escapeHtml(slide.name || 'slide.svg')}</strong>
+                            <div class="focused-preview-slide-meta">${escapeHtml(metaParts.join(' · '))}</div>
+                        </div>
+                    `;
+                }).join('')
+                : '<div class="focused-preview-slide-item"><div class="focused-preview-slide-meta">当前还没有可展示的幻灯片清单。</div></div>';
+
+            refreshButton.disabled = isProjectBusy(project.name, 'preview_state');
+            refreshButton.textContent = isProjectBusy(project.name, 'preview_state') ? '刷新中…' : '刷新预览状态';
+            refreshButton.onclick = () => refreshProjectPreviewState(project.name);
+
+            if (livePreviewUrl) {
+                popout.href = livePreviewUrl;
+                popout.style.display = '';
+            } else {
+                popout.href = '#';
+                popout.style.display = 'none';
+            }
+
+            if (running) {
+                placeholder.textContent = '正在加载 Live Preview 编辑器…';
+                frameWrap.classList.add('ready');
+                if (frame.dataset.previewUrl !== livePreviewUrl) {
+                    frame.src = livePreviewUrl;
+                    frame.dataset.previewUrl = livePreviewUrl;
+                }
+            } else {
+                frameWrap.classList.remove('ready');
+                placeholder.textContent = previewState.preview_error
+                    ? `预览接口暂不可用：${previewState.preview_error}`
+                    : '当前项目的 Live Preview 未运行。点击项目卡片里的“启动预览”后，这里会直接显示编辑器。';
+                frame.removeAttribute('src');
+                frame.dataset.previewUrl = '';
+            }
+        }
+
+        function renderOpenProjectWorkspace() {
+            const container = document.getElementById('openProjectWorkspace');
+            const openProjects = projectState.openProjects.map((projectName) => projectByName(projectName)).filter(Boolean);
+            const runningCount = openProjects.filter((project) => project.has_preview).length;
+            ensureFocusedProject();
+            document.getElementById('workspaceSummary').textContent = openProjects.length
+                ? `已打开 ${openProjects.length} 个 project，其中 ${runningCount} 个正在运行预览。当前聚焦：${projectState.focusedProjectName || '未选择'}`
+                : '当前未打开任何项目。';
+
+            if (!openProjects.length) {
+                container.innerHTML = '<div class="empty">从上面的项目列表中点击“打开到工作区”即可同时管理多个 project。</div>';
+                renderFocusedPreview();
+                renderFocusedProjectAssets();
+                return;
+            }
+
+            container.innerHTML = openProjects.map((project) => {
+                const previewState = previewStateForProject(project.name);
+                const assetSummary = project.asset_summary || {};
+                const previewAction = project.has_preview
+                    ? projectActionButton(project, 'stop', '关闭预览', 'btn-ghost btn-small', 'stopProjectPreview')
+                    : projectActionButton(project, 'start', '启动预览', 'btn-ghost btn-small', 'startProjectPreview');
+                const previewLink = project.live_preview_url
+                    ? `<a class="btn btn-ghost btn-small" href="${escapeHtml(project.live_preview_url)}" target="_blank" rel="noopener">弹出预览</a>`
+                    : '';
+                const downloadLink = project.latest_export
+                    ? `<a class="btn btn-ghost btn-small" href="/api/projects/${encodeURIComponent(project.name)}/exports/${encodeURIComponent(project.latest_export)}">下载最新</a>`
+                    : '';
+                const focusButton = `<button class="btn btn-ghost btn-small" type="button" onclick='setFocusedProject(${JSON.stringify(project.name)})'>${projectState.focusedProjectName === project.name ? '当前聚焦' : '聚焦预览'}</button>`;
+                const assetButton = `<button class="btn btn-ghost btn-small" type="button" onclick='viewProjectAssets(${JSON.stringify(project.name)})'>查看素材</button>`;
+                const refreshStateButton = `<button class="btn btn-ghost btn-small" type="button" ${isProjectBusy(project.name, 'preview_state') ? 'disabled' : ''} onclick='refreshProjectPreviewState(${JSON.stringify(project.name)})'>${isProjectBusy(project.name, 'preview_state') ? '刷新中…' : '刷新预览状态'}</button>`;
+
+                return `
+                    <article class="workspace-card ${projectState.focusedProjectName === project.name ? 'active' : ''}">
+                        <div class="workspace-head">
+                            <div>
+                                <div class="workspace-title">${escapeHtml(project.name)}</div>
+                                <div class="project-meta">${escapeHtml(project.path || '')}</div>
+                            </div>
+                            <button class="btn btn-ghost btn-small" type="button" onclick='closeProjectWorkspace(${JSON.stringify(project.name)})'>移出工作区</button>
+                        </div>
+
+                        <div class="project-tags">
+                            ${project.has_preview ? `<span class="project-chip success">Preview ${escapeHtml(project.live_preview_port || 5050)}</span>` : '<span class="project-chip warning">Preview 未运行</span>'}
+                            ${project.has_exports ? `<span class="project-chip success">${escapeHtml(project.export_count || 0)} 个导出</span>` : '<span class="project-chip warning">暂无导出</span>'}
+                            <span class="project-chip">图片 ${escapeHtml(assetSummary.image_count || 0)}</span>
+                            <span class="project-chip">公式 ${escapeHtml(assetSummary.formula_count || 0)}</span>
+                            <span class="project-chip">候选 ${escapeHtml(assetSummary.candidate_material_count || 0)}</span>
+                            ${Number(assetSummary.selected_for_deck_count || 0) > 0 ? `<span class="project-chip success">已采用 ${escapeHtml(assetSummary.selected_for_deck_count || 0)}</span>` : '<span class="project-chip">已采用 0</span>'}
+                            ${Number(assetSummary.formula_failed_count || 0) > 0 ? `<span class="project-chip warning">公式失败 ${escapeHtml(assetSummary.formula_failed_count || 0)}</span>` : '<span class="project-chip success">公式失败 0</span>'}
+                        </div>
+
+                        <div class="workspace-meta-grid">
+                            <div class="workspace-meta-item"><strong>画布</strong><span>${escapeHtml(project.canvas_format || 'ppt169')}</span></div>
+                            <div class="workspace-meta-item"><strong>源文件</strong><span>${escapeHtml(project.source_count || 0)} 个</span></div>
+                            <div class="workspace-meta-item"><strong>创建时间</strong><span>${escapeHtml(project.created_at || '未知')}</span></div>
+                            <div class="workspace-meta-item"><strong>最近更新</strong><span>${escapeHtml(project.updated_at || '未知')}</span></div>
+                            <div class="workspace-meta-item"><strong>最新导出</strong><span>${escapeHtml(project.latest_export || '暂无')}</span></div>
+                        </div>
+
+                        <div class="project-tags">${projectTags(project)}</div>
+
+                        <div class="project-actions">
+                            ${focusButton}
+                            ${assetButton}
+                            ${refreshStateButton}
+                            ${previewAction}
+                            ${previewLink}
+                            ${downloadLink}
+                            ${projectActionButton(project, 'regenerate', '重新生成', 'btn-ghost btn-small', 'regenerateProject')}
+                            ${projectActionButton(project, 'delete', '删除项目', 'btn-ghost btn-small btn-danger', 'deleteProject')}
+                        </div>
+
+                        <div class="workspace-summary-strip">${escapeHtml(previewSummaryText(project, previewState))}</div>
+                    </article>
+                `;
+            }).join('');
+            renderFocusedPreview();
+            renderFocusedProjectAssets();
         }
 
         function formatArtifacts(artifacts) {
@@ -1256,14 +2980,92 @@
             list.innerHTML = items.map((item) => {
                 const sizeText = item.width && item.height ? `${item.width} × ${item.height}px` : '尺寸未知';
                 const orientation = orientationLabels[item.orientation] || item.orientation || '未知';
+                const metaParts = [];
+                if (item.figure_label) metaParts.push(`图号 ${item.figure_label}`);
+                if (item.section_heading) metaParts.push(`章节 ${item.section_heading}`);
                 const context = item.context ? ` · ${item.context}` : '';
                 return `
                     <div class="image-item">
                         <span class="image-title">${escapeHtml(item.id || 'IMG')} · ${escapeHtml(item.alt || '未命名图片')}</span>
-                        <div class="image-meta">${escapeHtml(sizeText)} · ${escapeHtml(orientation)} · ${escapeHtml(item.source_file || '未知来源')}${escapeHtml(context)}</div>
+                        <div class="image-meta">${escapeHtml(sizeText)} · ${escapeHtml(orientation)} · ${escapeHtml(item.source_file || '未知来源')}${metaParts.length ? ` · ${escapeHtml(metaParts.join(' · '))}` : ''}${escapeHtml(context)}</div>
                     </div>
                 `;
             }).join('');
+            box.classList.add('show');
+        }
+
+        function renderAssetMatchDiagnostics(diagnosticsPayload, artifacts) {
+            const box = document.getElementById('assetMatchBox');
+            const summary = document.getElementById('assetMatchSummary');
+            const links = document.getElementById('assetMatchLinks');
+            const list = document.getElementById('assetMatchList');
+            const items = diagnosticsPayload?.items || [];
+            const reportNames = new Set(diagnosticsPayload?.report_files || []);
+            const reportArtifacts = (artifacts || []).filter((artifact) => reportNames.has(artifact.name));
+
+            if (!items.length && !reportArtifacts.length) {
+                box.classList.remove('show');
+                return;
+            }
+
+            summary.textContent = items.length
+                ? `共 ${diagnosticsPayload.count || items.length} 个章节匹配诊断${diagnosticsPayload.truncated ? '，当前仅展示前几项' : ''}。展开可查看每个 section 命中了哪些 asset、各自分数和命中原因。`
+                : '本次生成已输出诊断报告文件，可直接打开查看。';
+            links.innerHTML = formatArtifacts(reportArtifacts);
+
+            list.innerHTML = items.map((section) => {
+                const selectedAssets = section.selected_assets || [];
+                const topCandidates = section.top_candidates || [];
+                const selectedHtml = selectedAssets.length
+                    ? selectedAssets.map((candidate) => `
+                        <div class="match-candidate">
+                            <strong>${escapeHtml(candidate.asset_id || 'NO_ID')} · ${escapeHtml(candidate.asset_label || 'asset')}</strong>
+                            <div class="match-meta">${escapeHtml(candidate.asset_type || 'image')} · ${escapeHtml(candidate.source_kind || 'unknown')} · score ${escapeHtml(candidate.score || 0)}</div>
+                            ${(candidate.figure_label || candidate.figure_caption) ? `<div class="match-meta">${candidate.figure_label ? `图号 ${escapeHtml(candidate.figure_label)}` : ''}${candidate.figure_label && candidate.figure_caption ? ' · ' : ''}${candidate.figure_caption ? `图注 ${escapeHtml(candidate.figure_caption)}` : ''}</div>` : ''}
+                            ${(candidate.reasons || []).length ? `<div class="match-reason">原因：${escapeHtml(candidate.reasons.join('；'))}</div>` : ''}
+                        </div>
+                    `).join('')
+                    : '<div class="match-meta">本节未自动落图。</div>';
+
+                const topHtml = topCandidates.length
+                    ? topCandidates.map((candidate) => `
+                        <div class="match-candidate">
+                            <strong>[${escapeHtml(candidate.decision || 'unknown')}] ${escapeHtml(candidate.asset_id || 'NO_ID')} · ${escapeHtml(candidate.asset_label || 'asset')}</strong>
+                            <div class="match-meta">${escapeHtml(candidate.asset_type || 'image')} · ${escapeHtml(candidate.source_kind || 'unknown')} · score ${escapeHtml(candidate.score || 0)}${candidate.explicit_binding ? ' · 显式绑定' : ''}</div>
+                            ${(candidate.matched_figure_refs || []).length ? `<div class="match-meta">命中图号：${escapeHtml(candidate.matched_figure_refs.join(', '))}</div>` : ''}
+                            ${(candidate.shared_tokens || []).length ? `<div class="match-meta">共享 token：${escapeHtml(candidate.shared_tokens.join(', '))}</div>` : ''}
+                            ${(candidate.reasons || []).length ? `<div class="match-reason">原因：${escapeHtml(candidate.reasons.join('；'))}</div>` : ''}
+                        </div>
+                    `).join('')
+                    : '<div class="match-meta">没有候选素材。</div>';
+
+                return `
+                    <details class="match-section">
+                        <summary class="match-summary">
+                            <div>
+                                <span class="match-title">${escapeHtml(section.section_title || '未命名章节')}</span>
+                                <div class="match-subtitle">${escapeHtml(section.lead || '无 lead')}</div>
+                                <div class="match-meta">${(section.section_figure_refs || []).length ? `显式图号：${escapeHtml(section.section_figure_refs.join(', '))}` : '未检测到显式图号'} · 布局 ${escapeHtml(section.layout_hint || 'insight')} · 容量 ${escapeHtml(section.capacity || 0)} · 剩余 ${escapeHtml(section.available_capacity || 0)}</div>
+                            </div>
+                            <div class="match-badges">
+                                <span class="match-badge success">已选 ${escapeHtml(selectedAssets.length)}</span>
+                                <span class="match-badge warning">候选 ${escapeHtml(topCandidates.length)}</span>
+                            </div>
+                        </summary>
+                        <div class="match-body">
+                            <div class="match-group">
+                                <h3>已选素材</h3>
+                                <div class="match-list">${selectedHtml}</div>
+                            </div>
+                            <div class="match-group">
+                                <h3>Top 候选与原因</h3>
+                                <div class="match-list">${topHtml}</div>
+                            </div>
+                        </div>
+                    </details>
+                `;
+            }).join('');
+
             box.classList.add('show');
         }
 
@@ -1274,6 +3076,7 @@
                 box.classList.remove('show');
                 return;
             }
+            showOperationResultPanel();
             list.innerHTML = steps.map((step) => {
                 const parts = [];
                 if (step.command) parts.push(`命令:\n${step.command}`);
@@ -1421,13 +3224,22 @@
             box.classList.add('show');
         }
 
+        async function fetchJson(url, options = {}) {
+            const response = await fetch(url, options);
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || payload.success === false) {
+                throw new Error(payload.error || payload.message || `HTTP ${response.status}`);
+            }
+            return payload;
+        }
+
         async function loadToolboxCatalog() {
             try {
                 const response = await fetch('/api/toolbox/catalog');
                 const data = await response.json();
                 toolboxCatalog = data;
                 renderToolActions(data.actions || []);
-                renderProjectList(data.projects || []);
+                syncProjects(data.projects || []);
                 renderLibraryList('layoutLibrary', data.layouts || [], 'layoutCount');
                 renderLibraryList('brandLibrary', data.brands || [], 'brandCount');
                 renderChartLibrary(data.charts || []);
@@ -1435,6 +3247,7 @@
             } catch (error) {
                 console.error(error);
                 document.getElementById('toolActionHint').textContent = `工具箱加载失败：${error.message}`;
+                showProjectMessage(`工具箱加载失败：${error.message}`, 'error');
             }
         }
 
@@ -1451,8 +3264,7 @@
                 metaParts.push(`落版图 ${data.placed_image_count}`);
             }
             document.getElementById('resultMeta').textContent = metaParts.join(' · ');
-            document.getElementById('resultModel').textContent = '';
-            document.getElementById('resultGrounding').textContent = '';
+            showOperationResultPanel();
             document.getElementById('downloadLink').href = data.download_url;
             document.getElementById('resultArtifacts').innerHTML = formatArtifacts(data.artifacts || []);
             document.getElementById('resultBox').classList.add('show');
@@ -1463,6 +3275,7 @@
             renderConfigUsed(data.config_used || {});
             renderFileLocations(data.file_locations || []);
             renderSourceImages(data.source_images || {});
+            renderAssetMatchDiagnostics(data.asset_match_diagnostics || {}, data.artifacts || []);
             renderRunLogs(data.steps || []);
         }
 
@@ -1572,9 +3385,11 @@
 
                 renderProgress(normalizeSteps(resultPayload.steps || [], []));
                 showResult(resultPayload);
-                refreshProjects();
+                await refreshProjects(resultPayload.project_name || null);
+                return resultPayload;
             } catch (error) {
                 alert(`${errorPrefix}：${error.message}`);
+                return null;
             } finally {
                 if (button) {
                     resetBusy(button);
@@ -1582,113 +3397,85 @@
             }
         }
 
-        async function generateFromFile() {
-            if (!selectedFile) return;
-            const button = document.getElementById('fileSubmit');
-
-            const form = new FormData();
-            form.append('file', selectedFile);
-            form.append('project_name', document.getElementById('fileProjectName').value);
-            form.append('canvas_format', document.getElementById('fileCanvas').value);
-            form.append('pdf_parser', document.getElementById('filePdfParser').value);
-
-            await runGenerationStream({
-                endpoint: '/api/upload/stream',
-                fetchOptions: { method: 'POST', body: form },
-                pendingLabels: ['转换素材', '创建项目', '导入素材', '生成 PPT'],
-                button,
-                busyText: '生成中…',
-                errorPrefix: '生成失败',
-            });
-        }
-
-        async function generateFromUrl() {
-            const button = document.getElementById('urlSubmit');
-            const url = document.getElementById('urlInput').value.trim();
-            if (!url) {
-                alert('请输入 URL');
-                return;
-            }
-            await runGenerationStream({
-                endpoint: '/api/upload-url/stream',
-                fetchOptions: {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        url,
-                        project_name: document.getElementById('urlProjectName').value,
-                        canvas_format: document.getElementById('urlCanvas').value,
-                    }),
-                },
-                pendingLabels: ['抓取网页', '创建项目', '导入素材', '生成 PPT'],
-                button,
-                busyText: '生成中…',
-                errorPrefix: '生成失败',
-            });
-        }
-
-        async function generateFromText() {
-            const button = document.getElementById('textSubmit');
-            const content = document.getElementById('textInput').value.trim();
-            if (!content) {
-                alert('请输入正文内容');
-                return;
-            }
-            await runGenerationStream({
-                endpoint: '/api/generate-text/stream',
-                fetchOptions: {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        content,
-                        project_name: document.getElementById('textProjectName').value,
-                        canvas_format: document.getElementById('textCanvas').value,
-                    }),
-                },
-                pendingLabels: ['创建项目', '写入素材', '生成 PPT'],
-                button,
-                busyText: '生成中…',
-                errorPrefix: '生成失败',
-            });
-        }
-
-        async function regenerateProject(projectName) {
-            await runGenerationStream({
-                endpoint: `/api/projects/${encodeURIComponent(projectName)}/generate/stream`,
-                fetchOptions: {
+        async function startProjectPreview(projectName) {
+            setProjectBusy(projectName, 'start', true);
+            clearProjectMessage();
+            try {
+                const data = await fetchJson(`/api/projects/${encodeURIComponent(projectName)}/preview/start`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({}),
-                },
-                pendingLabels: ['生成 PPT'],
-                button: null,
-                errorPrefix: '生成失败',
-            });
+                });
+                await refreshProjects(projectName);
+                setFocusedProject(projectName);
+                await refreshProjectPreviewState(projectName, { quiet: true, background: true });
+                showProjectMessage(data.message || `已启动 ${projectName} 的预览。`, 'success');
+            } catch (error) {
+                showProjectMessage(`启动预览失败：${error.message}`, 'error');
+            } finally {
+                setProjectBusy(projectName, 'start', false);
+            }
         }
 
-        async function deleteProject(projectName, button) {
+        async function stopProjectPreview(projectName) {
+            setProjectBusy(projectName, 'stop', true);
+            clearProjectMessage();
+            try {
+                const data = await fetchJson(`/api/projects/${encodeURIComponent(projectName)}/preview/stop`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({}),
+                });
+                await refreshProjects();
+                projectState.previewStates[projectName] = emptyPreviewState(projectName);
+                renderOpenProjectWorkspace();
+                renderFocusedPreview();
+                showProjectMessage(data.message || `已关闭 ${projectName} 的预览。`, 'success');
+            } catch (error) {
+                showProjectMessage(`关闭预览失败：${error.message}`, 'error');
+            } finally {
+                setProjectBusy(projectName, 'stop', false);
+            }
+        }
+
+        async function regenerateProject(projectName) {
+            setProjectBusy(projectName, 'regenerate', true);
+            clearProjectMessage();
+            try {
+                const payload = await runGenerationStream({
+                    endpoint: `/api/projects/${encodeURIComponent(projectName)}/generate/stream`,
+                    fetchOptions: {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({}),
+                    },
+                    pendingLabels: ['生成 PPT'],
+                    button: null,
+                    errorPrefix: '生成失败',
+                });
+                if (payload) {
+                    showProjectMessage(`已完成 ${projectName} 的重新生成。`, 'success');
+                }
+            } finally {
+                setProjectBusy(projectName, 'regenerate', false);
+            }
+        }
+
+        async function deleteProject(projectName) {
             if (!confirm(`确定删除项目 ${projectName} 吗？这会移除 projects/ 下的完整目录。`)) {
                 return;
             }
 
-            if (button) {
-                setBusy(button, '删除中…');
-            }
+            setProjectBusy(projectName, 'delete', true);
+            clearProjectMessage();
             try {
-                const response = await fetch(`/api/projects/${encodeURIComponent(projectName)}`, {
-                    method: 'DELETE',
-                });
-                const data = await response.json();
-                if (!response.ok || !data.success) {
-                    throw new Error(data.error || '删除失败');
-                }
-                renderProjectList(data.projects || []);
+                const data = await fetchJson(`/api/projects/${encodeURIComponent(projectName)}`, { method: 'DELETE' });
+                syncProjects(data.projects || []);
+                showProjectMessage(data.message || `已删除 ${projectName}。`, 'success');
             } catch (error) {
-                alert(`删除项目失败：${error.message}`);
+                showProjectMessage(`删除项目失败：${error.message}`, 'error');
             } finally {
-                if (button) {
-                    resetBusy(button);
-                }
+                setProjectBusy(projectName, 'delete', false);
             }
         }
 
@@ -1778,15 +3565,40 @@
             }
         }
 
-        async function refreshProjects() {
+        async function refreshProjects(autoOpenProject = null) {
             try {
-                const response = await fetch('/api/projects');
-                const projects = await response.json();
-                renderProjectList(projects);
+                const projects = await fetchJson('/api/projects');
+                syncProjects(projects, { autoOpenProject });
             } catch (error) {
                 console.error(error);
+                showProjectMessage(`刷新项目失败：${error.message}`, 'error');
             }
         }
+
+        Object.values(projectFilters).forEach((element) => {
+            element.addEventListener('input', applyProjectFilters);
+            element.addEventListener('change', applyProjectFilters);
+        });
+
+        document.getElementById('assetKeywordFilterInput').addEventListener('input', (event) => {
+            updateFocusedAssetView({ keyword: event.target.value });
+        });
+        document.getElementById('assetTypeFilterSelect').addEventListener('change', (event) => {
+            updateFocusedAssetView({ type: event.target.value });
+        });
+        document.getElementById('assetStatusFilterSelect').addEventListener('change', (event) => {
+            updateFocusedAssetView({ status: event.target.value });
+        });
+        document.getElementById('assetSourceFilterSelect').addEventListener('change', (event) => {
+            updateFocusedAssetView({ sourceFile: event.target.value });
+        });
+
+        document.getElementById('refreshProjectsButton').addEventListener('click', () => refreshProjects());
+        document.getElementById('clearOpenProjectsButton').addEventListener('click', clearOpenProjects);
+
+        window.setInterval(() => {
+            refreshOpenProjectPreviewStates({ quiet: true, background: true });
+        }, 10000);
 
         loadToolboxCatalog();
     </script>
