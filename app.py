@@ -106,6 +106,12 @@ process_formula_manifest = _LATEX_TO_SVG_MODULE.process_manifest
 load_formula_manifest_entries = _LATEX_TO_SVG_MODULE.load_manifest
 save_formula_manifest_entries = _LATEX_TO_SVG_MODULE.save_manifest
 
+_STABILIZE_MODULE = _load_script_module(
+    "ppt_master_stabilize_image_assets",
+    SCRIPTS_DIR / "stabilize_image_assets.py",
+)
+stabilize_image_assets = _STABILIZE_MODULE.stabilize_assets
+
 TOOL_ACTIONS = [
     {
         "key": "project_info",
@@ -433,6 +439,15 @@ def _detect_converter(filename: str) -> Path | None:
     return None
 
 
+def _detect_canvas_format_from_path(project_path: Path) -> str:
+    """Infer canvas format key from the project directory name."""
+    name = project_path.name
+    for fmt_key in ("ppt169", "ppt43", "a4portrait", "xiaohongshu", "story"):
+        if f"_{fmt_key}_" in name or name.startswith(f"{fmt_key}_"):
+            return fmt_key
+    return "ppt169"
+
+
 def _extract_existing_path(text: str, suffix: str) -> Path | None:
     for raw_line in text.splitlines():
         line = raw_line.strip().strip('"')
@@ -558,6 +573,20 @@ def _archive_gui_sources(project_path: Path, source_paths: list[Path]) -> dict[s
         )
     elif formula_sync.get("removed"):
         summary["notes"].append("公式同步：当前项目未检测到 LaTeX 公式，已清理旧公式产物。")
+
+    # Stabilize image assets: generate short aliases and dimension table
+    try:
+        stabilize_result = stabilize_image_assets(
+            str(project_path), canvas_key=_detect_canvas_format_from_path(project_path),
+        )
+        asset_count = stabilize_result.get("count", 0)
+        formula_count = stabilize_result.get("formula_count", 0)
+        if asset_count:
+            summary["notes"].append(
+                f"素材稳定化：共 {asset_count} 个素材已生成别名与尺寸表，其中公式 {formula_count} 个。"
+            )
+    except Exception as exc:
+        summary["notes"].append(f"图片稳定化失败：{exc}")
 
     return summary
 
@@ -2015,6 +2044,13 @@ def _load_formula_assets(project_path: Path) -> list[dict[str, Any]]:
             "candidate_material": bool(extra.get("candidate_material", False)),
             "selected_for_deck": bool(extra.get("selected_for_deck", False)),
             "tags": tags,
+            "short_alias": str(extra.get("short_alias") or "").strip(),
+            "svg_width": getattr(entry, "svg_width", None),
+            "svg_height": getattr(entry, "svg_height", None),
+            "display_ratio": extra.get("display_ratio"),
+            "recommended_layout": str(extra.get("recommended_layout") or "").strip(),
+            "recommended_display_w": extra.get("recommended_display_w"),
+            "recommended_display_h": extra.get("recommended_display_h"),
         }
         _append_source_asset(
             formula_assets,
@@ -2465,6 +2501,11 @@ def _serialize_project_asset(project_path: Path, raw_asset: dict[str, Any]) -> d
         "width": raw_asset.get("width"),
         "height": raw_asset.get("height"),
         "orientation": str(raw_asset.get("orientation") or ""),
+        "short_alias": str(raw_asset.get("short_alias") or ""),
+        "display_ratio": raw_asset.get("display_ratio"),
+        "recommended_layout": str(raw_asset.get("recommended_layout") or ""),
+        "recommended_display_w": raw_asset.get("recommended_display_w"),
+        "recommended_display_h": raw_asset.get("recommended_display_h"),
         "latex": str(raw_asset.get("latex") or ""),
         "display": raw_asset.get("display"),
         "error": str(raw_asset.get("render_error") or raw_asset.get("error") or ""),

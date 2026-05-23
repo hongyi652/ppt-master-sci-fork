@@ -16,6 +16,8 @@ Layout rules for pages where source images must remain visually complete. Strate
 
 **Hard rule**: for user-provided, MinerU-extracted, source-document, chart, screenshot, product, and evidence images, complete display outranks decorative filling. Use `preserveAspectRatio="xMidYMid meet"` and resize the image container from the native ratio.
 
+**Large-source-image rule**: when the source document already gives an image substantial area and the image carries dense information, preserve that narrative weight in the deck. Do not demote a large paper figure, screenshot, chart, or evidence image into a small accent frame. If readable complete-display size conflicts with a text-first layout, let the image take the dominant zone or move part of the narrative onto another page.
+
 **Crop exception**: use `preserveAspectRatio="xMidYMid slice"` only when the image row explicitly marks `Display mode: crop-ok` or the image is a disposable decorative background where losing edges does not remove information.
 
 | Image kind | Default display mode | Layout action |

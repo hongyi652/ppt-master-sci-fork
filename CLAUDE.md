@@ -50,11 +50,15 @@ Convenience summary only — full workflow in [`skills/ppt-master/SKILL.md`](ski
 
 ```bash
 # Source content conversion
-python3 skills/ppt-master/scripts/source_to_md/mineru_to_md.py <PDF_file>
+python3 skills/ppt-master/scripts/convert_pdf.py <PDF_file>                          # stable wrapper: proxy/SSL, retry, zip, report
+python3 skills/ppt-master/scripts/source_to_md/mineru_to_md.py <PDF_file>            # direct MinerU call
 python3 skills/ppt-master/scripts/source_to_md/doc_to_md.py <DOCX_or_other_file>
 python3 skills/ppt-master/scripts/source_to_md/excel_to_md.py <XLSX_or_XLSM_file>
 python3 skills/ppt-master/scripts/source_to_md/ppt_to_md.py <PPTX_file>
 python3 skills/ppt-master/scripts/source_to_md/web_to_md.py <URL>
+
+# Pre-run checks
+python3 skills/ppt-master/scripts/preflight_check.py <project_path>                  # environment + project sanity check
 
 # Project management
 python3 skills/ppt-master/scripts/project_manager.py init <project_name> --format ppt169
@@ -63,6 +67,7 @@ python3 skills/ppt-master/scripts/project_manager.py validate <project_path>
 
 # Image tools and SVG quality check
 python3 skills/ppt-master/scripts/analyze_images.py <project_path>/images
+python3 skills/ppt-master/scripts/stabilize_image_assets.py <project_path>            # short aliases + dimension table
 # In-pipeline AI image generation — manifest mode (required, even for 1 image):
 python3 skills/ppt-master/scripts/image_gen.py --manifest <project_path>/images/image_prompts.json
 python3 skills/ppt-master/scripts/image_gen.py --render-md <project_path>/images/image_prompts.json

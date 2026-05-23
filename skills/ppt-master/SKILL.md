@@ -313,6 +313,8 @@ If the user provided images, run analysis **before outputting the design spec**:
 python3 ${SKILL_DIR}/scripts/analyze_images.py <project_path>/images
 ```
 
+> ⚠️ **Image scale iron rule**: when the deck uses source-document images (paper figures, screenshots, source charts, dense diagrams, evidence photos, product photos), Strategist MUST `read_file references/image-layout-spec.md` before locking §VIII and the outline. Plan from native dimensions and readable complete-display size, not from a text-first placeholder box. Large, information-bearing source images may own the page or dominant zone; they must not be shrunk into a small supporting tile just to preserve extra bullets. If image + text cannot both remain readable, reduce text density or split the material across more pages.
+
 > ⚠️ **Image handling**: NEVER directly read / open / view image files (`.jpg`, `.png`, etc.). All image info comes from `analyze_images.py` output or the Design Spec's Image Resource List.
 
 **Output**:

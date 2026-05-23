@@ -318,6 +318,8 @@ Handle images by their status in the Design Spec's Image Resource List. Status e
 
 **Completeness-first override**: the current default is `complete`, not crop. For Existing, MinerU-extracted, source-document, chart, screenshot, product, and evidence images, size the container from the image's native ratio (from `analyze_images.py`, manifest dimensions, or file dimensions) and use `preserveAspectRatio="xMidYMid meet"`. Treat legacy `no-crop` tags as an explicit restatement of this default.
 
+**Scale integrity enforcement**: do not render a large, content-bearing source image as a tiny inset just to protect surrounding text blocks. If the current composition makes chart labels, figure annotations, screenshot UI, or other core details hard to read at slide size, reallocate the page so the image becomes dominant. If the page still cannot fit both image and text at a readable size without narrative changes, surface a warning that the page needs re-planning instead of silently miniaturizing the image.
+
 | Display mode | When allowed | Executor action |
 |---|---|---|
 | `complete` | Default for all content-bearing images | Preserve the full image; resize/reposition the container around the native ratio |

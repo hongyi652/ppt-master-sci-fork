@@ -395,6 +395,8 @@ After the user picks a candidate, scan the outline and surface any pages where t
 
 **When selection includes B**, you must run `python3 scripts/analyze_images.py <project_path>/images` before outputting the spec, and integrate scan results into the image resource list.
 
+**Iron rule — image scale integrity**: treat native dimensions and readable complete-display size as planning inputs, not as metadata. When a source-document image is large and information-bearing (paper figure, screenshot, chart, dense diagram, evidence image, product photo), do not demote it to a tiny supporting thumbnail in the PPT just to keep more bullets on the page. If a text-first composition would make the image hard to read, enlarge the image to a dominant zone, give it the page, or split the material across more pages.
+
 **Hard rule — source-first asset inventory**: before drafting §VIII, enumerate every original asset already present in `<project_path>/images/` and every rendered `formula_*.svg` from `formula_manifest.json`. Treat paper figures, screenshots, source charts, MinerU/PDF-extracted images, EMF/WMF vectors, and formulas as first-class candidate assets. Prefer these originals before proposing AI or web replacements.
 
 **When B / C / D / E is selected, or when source formulas / source figures / source charts will appear in the deck**, add an image resource list to the spec:
@@ -418,6 +420,8 @@ After the user picks a candidate, scan the outline and surface any pages where t
 **Legacy `no-crop` tag**: older specs may append `no-crop`; the current schema records the same intent as `Display mode: complete`. Do not rely on `no-crop` as an exception flag for new specs.
 
 **Display integrity override**: the current default is `Display mode: complete`. Use it for user-provided images, MinerU-extracted paper figures, screenshots, charts, certificates, contracts, dense diagrams, product photos, and evidence images. Executor uses `preserveAspectRatio="xMidYMid meet"` and sizes the container from the native ratio.
+
+**Scale integrity override**: original large source-document images are not supporting thumbnails by default. If a paper figure, screenshot, chart, or dense diagram would become hard to read at the planned size, increase its display area until the core content is readable, or move/split surrounding text. Do not preserve a text-heavy layout by shrinking the source image below useful reading size.
 
 **Crop exception**: set `Display mode: crop-ok` only for decorative backgrounds, atmosphere images, or full-bleed covers where losing edge pixels does not remove information. Never use `crop-ok` for charts, screenshots, paper figures, or product/evidence images.
 
@@ -467,7 +471,7 @@ After the user picks a candidate, scan the outline and surface any pages where t
 
 🚧 **GATE — before writing §VIII Image Resource List**: when image approach is B/C/D/E (anything other than A "no images"), this is a three-layer hard requirement, not a suggestion:
 
-1. **Read** — `read_file references/image-layout-patterns.md`. The file enumerates 72 numbered techniques split into **Part 1 — Primary Structures** (#1–#19 container layouts, #38–#46 image-as-canvas + native overlay, #47–#56 multi-image) and **Part 2 — Modifier Layers** (#20–#26 non-rectangular crops, #27–#37 overlays & masks, #57–#61 texture, #62–#72 special). The four `Image narrative intent` values below cover only broad categories.
+1. **Read** — `read_file references/image-layout-patterns.md` and `read_file references/image-layout-spec.md`. The first file enumerates 72 numbered techniques split into **Part 1 — Primary Structures** (#1–#19 container layouts, #38–#46 image-as-canvas + native overlay, #47–#56 multi-image) and **Part 2 — Modifier Layers** (#20–#26 non-rectangular crops, #27–#37 overlays & masks, #57–#61 texture, #62–#72 special). The second file defines ratio-first sizing, complete-display defaults, multi-image formulas, and the rule that large source-document images must stay large enough to read in the final slide.
 2. **Produce** — every row in §VIII Image Resource List MUST fill the `Layout pattern` column with one or more `#<id> <name>` joined by ` + ` drawn verbatim from this file (Primary + optional Modifiers). Rows with empty `Layout pattern` or with an id that does not exist in the file are invalid.
 3. **Image-as-canvas coverage** — for any deck with ≥4 image-bearing pages, at least one page MUST use a `#38–#46` pattern (image-as-canvas + native overlay) unless every image is a pure cover / chapter divider / atmosphere backdrop. This family is the most-skipped one and is usually the right answer for content-rich pages with photographs. If the deck legitimately has no opportunity for it, state the reason in §VIII directly under the table.
 

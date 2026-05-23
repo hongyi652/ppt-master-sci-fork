@@ -79,6 +79,7 @@ from latex_to_svg import (  # type: ignore
     process_manifest as process_formula_manifest,
     save_manifest as save_rendered_formula_manifest,
 )
+from stabilize_image_assets import stabilize_assets as stabilize_image_assets  # type: ignore
 
 
 def _curl_cffi_available() -> bool:
@@ -195,6 +196,15 @@ class ProjectManager:
         sources_dir = project_path / SOURCE_DIRNAME
         sources_dir.mkdir(parents=True, exist_ok=True)
         return sources_dir
+
+    @staticmethod
+    def _detect_canvas_format(project_dir: Path) -> str:
+        """Infer canvas format from the project directory name."""
+        name = project_dir.name
+        for fmt_key in CANVAS_FORMATS:
+            if f"_{fmt_key}_" in name or name.startswith(f"{fmt_key}_"):
+                return fmt_key
+        return "ppt169"
 
     def _ensure_unique_path(self, path: Path) -> Path:
         if not path.exists():
@@ -765,6 +775,19 @@ class ProjectManager:
             )
         elif formula_summary.get("removed"):
             summary["notes"].append("Formula sync: no LaTeX formulas detected, cleared stale formula artifacts.")
+
+        # Stabilize image assets: add short aliases and dimension table
+        canvas_format = self._detect_canvas_format(project_dir)
+        stabilize_result = stabilize_image_assets(
+            str(project_dir), canvas_key=canvas_format,
+        )
+        asset_count = stabilize_result.get("count", 0)
+        formula_count = stabilize_result.get("formula_count", 0)
+        if asset_count:
+            summary["notes"].append(
+                f"Asset stabilization: {asset_count} asset(s) measured, "
+                f"including {formula_count} formula SVG(s); aliases + size table written."
+            )
 
         return summary
 

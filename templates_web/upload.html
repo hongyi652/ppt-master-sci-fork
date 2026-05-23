@@ -1050,6 +1050,35 @@
             margin-top: 12px;
         }
 
+        .asset-card-facts {
+            display: grid;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .asset-card-fact {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 8px 10px;
+            border-radius: 10px;
+            border: 1px solid rgba(148, 163, 184, 0.10);
+            background: rgba(148, 163, 184, 0.06);
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .asset-card-fact-label {
+            color: var(--muted);
+            white-space: nowrap;
+        }
+
+        .asset-card-fact-value {
+            color: #f8fbff;
+            text-align: right;
+            word-break: break-word;
+        }
+
         .asset-plan-tag {
             display: inline-flex;
             align-items: center;
@@ -1994,6 +2023,33 @@
             return bits.join(' · ');
         }
 
+        function assetLayoutLabel(layout) {
+            if (layout === 'top-bottom') return '上下排版';
+            if (layout === 'left-right') return '左右排版';
+            if (layout === 'left-right-capped') return '左右排版（限宽）';
+            return layout || '';
+        }
+
+        function formatRecommendedDisplay(item) {
+            if (!item.recommended_display_w || !item.recommended_display_h) return '';
+            const size = `${item.recommended_display_w} × ${item.recommended_display_h}`;
+            const layout = assetLayoutLabel(item.recommended_layout);
+            return layout ? `${size} · ${layout}` : size;
+        }
+
+        function formulaCardFacts(item) {
+            if (item.asset_family !== 'formula') return [];
+            const facts = [];
+            if (item.short_alias) {
+                facts.push({ label: '别名', value: item.short_alias });
+            }
+            const recommendedDisplay = formatRecommendedDisplay(item);
+            if (recommendedDisplay) {
+                facts.push({ label: '推荐显示', value: recommendedDisplay });
+            }
+            return facts;
+        }
+
         function ensureAssetView(projectName) {
             const state = assetPanelState(projectName);
             if (!state.view) {
@@ -2054,12 +2110,15 @@
             const visibleTags = tagItems.slice(0, 4);
             const hiddenTagCount = Math.max(tagItems.length - visibleTags.length, 0);
             const planningTags = [];
+            const formulaFacts = formulaCardFacts(item);
             if (item.selected_for_deck) {
                 planningTags.push('<span class="asset-plan-tag selected">已采用</span>');
             } else if (item.candidate_material) {
                 planningTags.push('<span class="asset-plan-tag candidate">候选素材</span>');
             }
             const detailRows = [];
+            if (item.short_alias) detailRows.push(`<div class="detail-item"><span class="detail-label">别名</span><div class="detail-value">${escapeHtml(item.short_alias)}</div></div>`);
+            if (formatRecommendedDisplay(item)) detailRows.push(`<div class="detail-item"><span class="detail-label">推荐显示</span><div class="detail-value">${escapeHtml(formatRecommendedDisplay(item))}</div></div>`);
             if (item.description) detailRows.push(`<div class="detail-item"><span class="detail-label">描述</span><div class="detail-value">${escapeHtml(item.description)}</div></div>`);
             if (item.context) detailRows.push(`<div class="detail-item"><span class="detail-label">上下文</span><div class="detail-value">${escapeHtml(item.context)}</div></div>`);
             if (item.latex) detailRows.push(`<pre>${escapeHtml(item.latex)}</pre>`);
@@ -2088,6 +2147,16 @@
                             ${planningTags.join('')}
                             ${visibleTags.map((tag) => `<span class="project-tag">${escapeHtml(tag)}</span>`).join('')}
                             ${hiddenTagCount ? `<span class="project-tag">+${hiddenTagCount}</span>` : ''}
+                        </div>
+                    ` : ''}
+                    ${formulaFacts.length ? `
+                        <div class="asset-card-facts">
+                            ${formulaFacts.map((fact) => `
+                                <div class="asset-card-fact">
+                                    <span class="asset-card-fact-label">${escapeHtml(fact.label)}</span>
+                                    <span class="asset-card-fact-value">${escapeHtml(fact.value)}</span>
+                                </div>
+                            `).join('')}
                         </div>
                     ` : ''}
                     <div class="asset-card-actions">
