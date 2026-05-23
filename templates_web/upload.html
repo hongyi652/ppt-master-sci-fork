@@ -1,0 +1,1794 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PPT Master — 一键生成 PPT</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 32' fill='none' stroke='%231f6feb' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><rect x='2' y='2' width='44' height='28' rx='2.5'/><line x1='9' y1='11' x2='22' y2='11'/><line x1='9' y1='17' x2='32' y2='17'/><line x1='9' y1='23' x2='26' y2='23'/></svg>">
+    <style>
+        :root {
+            --bg: #0a0f1f;
+            --bg-soft: #11192f;
+            --panel: rgba(12, 20, 38, 0.82);
+            --panel-strong: rgba(16, 26, 49, 0.95);
+            --line: rgba(148, 163, 184, 0.18);
+            --text: #e8edf7;
+            --muted: #9eacc7;
+            --primary: #38bdf8;
+            --primary-strong: #2563eb;
+            --success: #34d399;
+            --error: #fb7185;
+            --shadow: 0 24px 80px rgba(5, 11, 24, 0.42);
+            --radius: 20px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at top, rgba(56, 189, 248, 0.18), transparent 34%),
+                radial-gradient(circle at 80% 12%, rgba(37, 99, 235, 0.16), transparent 26%),
+                linear-gradient(160deg, #07111f 0%, #0b1428 48%, #07111f 100%);
+        }
+
+        .shell {
+            max-width: 1240px;
+            margin: 0 auto;
+            padding: 32px 20px 56px;
+        }
+
+        .hero {
+            display: grid;
+            grid-template-columns: 1.2fr 0.8fr;
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .hero-main,
+        .hero-side,
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            backdrop-filter: blur(22px);
+            box-shadow: var(--shadow);
+        }
+
+        .hero-main {
+            padding: 28px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-main::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.20), transparent 36%, transparent 70%, rgba(37, 99, 235, 0.18));
+            pointer-events: none;
+        }
+
+        .hero-main h1 {
+            position: relative;
+            font-size: clamp(32px, 4vw, 54px);
+            line-height: 1.02;
+            letter-spacing: -0.04em;
+            max-width: 11ch;
+        }
+
+        .hero-main p {
+            position: relative;
+            margin-top: 14px;
+            max-width: 60ch;
+            color: var(--muted);
+            font-size: 15px;
+        }
+
+        .hero-badges {
+            position: relative;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 22px;
+        }
+
+        .badge {
+            padding: 8px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(56, 189, 248, 0.22);
+            background: rgba(56, 189, 248, 0.08);
+            color: #d8f3ff;
+            font-size: 12px;
+            letter-spacing: 0.02em;
+        }
+
+        .hero-side {
+            padding: 24px;
+            display: grid;
+            gap: 14px;
+            align-content: start;
+        }
+
+        .metric {
+            padding: 16px 18px;
+            border-radius: 18px;
+            background: var(--panel-strong);
+            border: 1px solid rgba(148, 163, 184, 0.12);
+        }
+
+        .metric strong {
+            display: block;
+            font-size: 28px;
+            color: #f8fbff;
+            letter-spacing: -0.03em;
+        }
+
+        .metric span {
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 1.05fr 0.95fr;
+            gap: 24px;
+        }
+
+        .panel {
+            padding: 24px;
+        }
+
+        .panel h2 {
+            font-size: 18px;
+            margin-bottom: 16px;
+        }
+
+        .panel .subtle {
+            color: var(--muted);
+            font-size: 13px;
+            margin-bottom: 14px;
+        }
+
+        .tabs {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+
+        .tab {
+            padding: 12px 14px;
+            border-radius: 14px;
+            border: 1px solid var(--line);
+            background: rgba(255, 255, 255, 0.02);
+            color: var(--muted);
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .tab.active {
+            color: #f8fbff;
+            border-color: rgba(56, 189, 248, 0.34);
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.16), rgba(37, 99, 235, 0.18));
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .dropzone,
+        textarea,
+        input[type="text"],
+        select {
+            width: 100%;
+            border-radius: 16px;
+            border: 1px solid var(--line);
+            background: rgba(6, 12, 24, 0.62);
+            color: var(--text);
+        }
+
+        .dropzone {
+            position: relative;
+            padding: 34px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: 0.2s ease;
+        }
+
+        .dropzone:hover,
+        .dropzone.drag-over {
+            border-color: rgba(56, 189, 248, 0.48);
+            background: rgba(56, 189, 248, 0.09);
+        }
+
+        .dropzone input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .dropzone strong {
+            color: #d8f3ff;
+        }
+
+        .drop-hint {
+            color: var(--muted);
+            font-size: 13px;
+            margin-top: 8px;
+        }
+
+        .selected-file {
+            display: none;
+            margin-top: 12px;
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: rgba(56, 189, 248, 0.10);
+            border: 1px solid rgba(56, 189, 248, 0.22);
+            align-items: center;
+            gap: 10px;
+        }
+
+        .selected-file.show {
+            display: flex;
+        }
+
+        .selected-file .filename {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .selected-file button {
+            border: none;
+            background: transparent;
+            color: var(--muted);
+            font-size: 18px;
+            cursor: pointer;
+        }
+
+        label {
+            display: block;
+            color: var(--muted);
+            font-size: 13px;
+            margin: 16px 0 8px;
+        }
+
+        input[type="text"],
+        select,
+        textarea {
+            padding: 12px 14px;
+            outline: none;
+            font-size: 14px;
+        }
+
+        textarea {
+            min-height: 220px;
+            resize: vertical;
+            line-height: 1.65;
+        }
+
+        input[type="text"]:focus,
+        select:focus,
+        textarea:focus {
+            border-color: rgba(56, 189, 248, 0.48);
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 180px;
+            gap: 12px;
+        }
+
+        .button-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 18px;
+        }
+
+        .conditional-control {
+            display: none;
+            margin-top: 16px;
+            padding: 14px;
+            border-radius: 16px;
+            border: 1px solid rgba(56, 189, 248, 0.18);
+            background: rgba(56, 189, 248, 0.07);
+        }
+
+        .conditional-control.show {
+            display: block;
+        }
+
+        .field-hint {
+            color: var(--muted);
+            font-size: 12px;
+            margin-top: 8px;
+            line-height: 1.6;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            border-radius: 14px;
+            border: 1px solid transparent;
+            padding: 12px 18px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: 0.2s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #38bdf8, #2563eb);
+            color: white;
+            min-width: 180px;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 14px 30px rgba(37, 99, 235, 0.32);
+        }
+
+        .btn-ghost {
+            background: rgba(255, 255, 255, 0.03);
+            border-color: var(--line);
+            color: var(--text);
+        }
+
+        .btn-ghost:hover {
+            border-color: rgba(56, 189, 248, 0.34);
+            color: #d8f3ff;
+        }
+
+        .btn-danger {
+            border-color: rgba(251, 113, 133, 0.28);
+            color: #ffd5dd;
+        }
+
+        .btn-danger:hover {
+            border-color: rgba(251, 113, 133, 0.44);
+            background: rgba(251, 113, 133, 0.10);
+            color: #fff1f4;
+        }
+
+        .btn-small {
+            padding: 9px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .progress,
+        .result,
+        .preview,
+        .project-list {
+            margin-top: 18px;
+        }
+
+        .progress {
+            display: none;
+            border-top: 1px solid var(--line);
+            padding-top: 18px;
+        }
+
+        .progress.show,
+        .result.show,
+        .preview.show {
+            display: block;
+        }
+
+        .step {
+            display: grid;
+            grid-template-columns: 26px 1fr;
+            gap: 12px;
+            padding: 10px 0;
+        }
+
+        .step + .step {
+            border-top: 1px solid rgba(148, 163, 184, 0.08);
+        }
+
+        .status {
+            width: 26px;
+            height: 26px;
+            border-radius: 999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+
+        .status.pending {
+            background: rgba(148, 163, 184, 0.16);
+            color: var(--muted);
+        }
+
+        .status.running {
+            background: rgba(56, 189, 248, 0.14);
+            color: #d8f3ff;
+        }
+
+        .status.success {
+            background: rgba(52, 211, 153, 0.16);
+            color: var(--success);
+        }
+
+        .status.error {
+            background: rgba(251, 113, 133, 0.16);
+            color: var(--error);
+        }
+
+        .step-detail {
+            margin-top: 4px;
+            color: var(--muted);
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 96px;
+            overflow: auto;
+        }
+
+        .result {
+            display: none;
+            padding: 18px;
+            border-radius: 18px;
+            background: rgba(52, 211, 153, 0.10);
+            border: 1px solid rgba(52, 211, 153, 0.22);
+        }
+
+        .result h3 {
+            font-size: 17px;
+            margin-bottom: 8px;
+        }
+
+        .result p {
+            color: var(--muted);
+            font-size: 13px;
+            margin-top: 4px;
+        }
+
+        .preview {
+            display: none;
+            padding: 16px;
+            border-radius: 18px;
+            background: rgba(4, 10, 22, 0.72);
+            border: 1px solid var(--line);
+        }
+
+        .preview pre {
+            font-family: "Cascadia Code", Consolas, monospace;
+            font-size: 12px;
+            color: var(--muted);
+            white-space: pre-wrap;
+            max-height: 260px;
+            overflow: auto;
+        }
+
+        .project-list {
+            display: grid;
+            gap: 12px;
+        }
+
+        .tool-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-top: 24px;
+        }
+
+        .tool-inline {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .library-heading {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-top: 22px;
+            margin-bottom: 10px;
+        }
+
+        .library-heading h3 {
+            font-size: 15px;
+        }
+
+        .small-hint {
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .library-list,
+        .note-list {
+            display: grid;
+            gap: 10px;
+            max-height: 220px;
+            overflow: auto;
+            padding-right: 4px;
+        }
+
+        .library-item,
+        .agent-item {
+            padding: 12px 14px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(148, 163, 184, 0.10);
+        }
+
+        .library-item strong,
+        .agent-item strong {
+            display: block;
+            margin-bottom: 4px;
+            font-size: 13px;
+        }
+
+        .library-summary,
+        .agent-reason,
+        .tool-status-line {
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .library-path,
+        .library-meta {
+            margin-top: 6px;
+            color: #cbd5e1;
+            font-size: 12px;
+            word-break: break-word;
+        }
+
+        .artifact-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .config-panel {
+            margin-top: 18px;
+            padding: 16px;
+            border-radius: 18px;
+            border: 1px solid rgba(56, 189, 248, 0.18);
+            background: rgba(56, 189, 248, 0.06);
+        }
+
+        .config-grid,
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .detail-grid {
+            align-items: start;
+        }
+
+        .detail-card {
+            padding: 14px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(148, 163, 184, 0.10);
+        }
+
+        .detail-card h3,
+        .log-head strong {
+            font-size: 14px;
+        }
+
+        .detail-list,
+        .log-list {
+            display: grid;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .detail-item,
+        .log-entry,
+        .image-item {
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(148, 163, 184, 0.10);
+        }
+
+        .detail-label,
+        .image-title {
+            display: block;
+            color: #f8fbff;
+            font-size: 12px;
+            margin-bottom: 6px;
+        }
+
+        .detail-value,
+        .image-meta,
+        .log-meta {
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.6;
+            word-break: break-word;
+        }
+
+        .path-link {
+            color: #d8f3ff;
+            text-decoration: none;
+        }
+
+        .path-link:hover {
+            text-decoration: underline;
+        }
+
+        .log-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .log-status {
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .log-entry pre {
+            margin-top: 10px;
+            max-height: 240px;
+        }
+
+        .project-path {
+            margin-top: 6px;
+            color: #cbd5e1;
+            font-size: 12px;
+            word-break: break-word;
+        }
+
+        .project-item {
+            padding: 16px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(148, 163, 184, 0.10);
+        }
+
+        .project-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: start;
+        }
+
+        .project-name {
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        .project-meta {
+            margin-top: 6px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .project-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 14px;
+        }
+
+        .empty {
+            text-align: center;
+            color: var(--muted);
+            padding: 22px 12px;
+            border: 1px dashed var(--line);
+            border-radius: 18px;
+        }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.22);
+            border-top-color: white;
+            animation: spin 0.7s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 1024px) {
+            .hero,
+            .layout,
+            .tool-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 680px) {
+            .shell {
+                padding-inline: 14px;
+            }
+
+            .tabs,
+            .row,
+            .tool-inline,
+            .config-grid,
+            .detail-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="shell">
+        <section class="hero">
+            <div class="hero-main">
+                <h1>直接上传素材，立刻生成可编辑 PPT</h1>
+                <p>这个 GUI 走本地直出模式：上传文件、网页链接或直接粘贴正文，直接导出可编辑的 PPTX，不依赖任何文本或图片生成模型。</p>
+                <div class="hero-badges">
+                    <span class="badge">文件 / URL / 文本 三种输入</span>
+                    <span class="badge">本地导出 .pptx</span>
+                    <span class="badge">本地结构化直出</span>
+                    <span class="badge">无图像模型依赖</span>
+                </div>
+            </div>
+            <div class="hero-side">
+                <div class="metric">
+                    <strong>1 Click</strong>
+                    <span>上传后直接导出基础版 PPTX</span>
+                </div>
+                <div class="metric">
+                    <strong>Editable</strong>
+                    <span>输出为可继续修改的 PowerPoint 文件</span>
+                </div>
+                <div class="metric">
+                    <strong>Local</strong>
+                    <span>项目、素材、导出文件全部保存在本地</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="layout">
+            <div class="panel">
+                <h2>一键生成</h2>
+                <p class="subtle">选择输入方式后，系统会自动创建项目、处理素材，并直接生成可下载的 PPTX。</p>
+
+                <div class="tabs">
+                    <button class="tab active" data-tab="tab-file" onclick="switchTab('tab-file')">上传文件</button>
+                    <button class="tab" data-tab="tab-url" onclick="switchTab('tab-url')">网页链接</button>
+                    <button class="tab" data-tab="tab-text" onclick="switchTab('tab-text')">直接粘贴</button>
+                </div>
+
+                <div id="tab-file" class="tab-content active">
+                    <div class="dropzone" id="dropzone">
+                        <input type="file" id="fileInput" accept=".pdf,.docx,.doc,.pptx,.ppt,.xlsx,.xlsm,.xls,.epub,.html,.htm,.md,.markdown,.txt,.csv,.tsv,.odt,.rtf,.tex,.rst">
+                        <div style="font-size:36px">⬆</div>
+                        <div>拖拽文件到这里，或<strong>点击选择</strong></div>
+                        <div class="drop-hint">支持 PDF / DOCX / PPTX / Excel / Markdown / TXT / CSV 等</div>
+                    </div>
+                    <div class="selected-file" id="selectedFile">
+                        <span>📎</span>
+                        <span class="filename" id="selectedFileName"></span>
+                        <span id="selectedFileSize"></span>
+                        <button type="button" onclick="clearFile()">×</button>
+                    </div>
+
+                    <label for="fileProjectName">项目名称</label>
+                    <input type="text" id="fileProjectName" placeholder="默认使用文件名">
+
+                    <label for="fileCanvas">画布格式</label>
+                    <select id="fileCanvas">
+                        <option value="ppt169" selected>PPT 16:9</option>
+                        <option value="ppt43">PPT 4:3</option>
+                        <option value="xhs">小红书 3:4</option>
+                        <option value="story">Story 9:16</option>
+                    </select>
+
+                    <div class="conditional-control" id="filePdfParserWrap">
+                        <label for="filePdfParser" style="margin-top:0;">PDF 解析器</label>
+                        <select id="filePdfParser">
+                            <option value="mineru" selected>MinerU 云解析（默认）</option>
+                            <option value="local">本地解析</option>
+                        </select>
+                        <div class="field-hint">默认使用 MinerU 云解析：系统会先把 PDF 上传到 MinerU 云端解析，再把返回的原文 Markdown 和图片用于本地 PPT 生成。</div>
+                    </div>
+
+                    <div class="button-row">
+                        <button class="btn btn-primary" id="fileSubmit" onclick="generateFromFile()" disabled>生成 PPT</button>
+                    </div>
+                </div>
+
+                <div id="tab-url" class="tab-content">
+                    <label for="urlInput">网页地址</label>
+                    <input type="text" id="urlInput" placeholder="https://example.com/article">
+
+                    <label for="urlProjectName">项目名称</label>
+                    <input type="text" id="urlProjectName" placeholder="默认使用域名">
+
+                    <label for="urlCanvas">画布格式</label>
+                    <select id="urlCanvas">
+                        <option value="ppt169" selected>PPT 16:9</option>
+                        <option value="ppt43">PPT 4:3</option>
+                        <option value="xhs">小红书 3:4</option>
+                        <option value="story">Story 9:16</option>
+                    </select>
+
+                    <div class="button-row">
+                        <button class="btn btn-primary" id="urlSubmit" onclick="generateFromUrl()">生成 PPT</button>
+                    </div>
+                </div>
+
+                <div id="tab-text" class="tab-content">
+                    <label for="textInput">正文内容</label>
+                    <textarea id="textInput" placeholder="# 标题&#10;&#10;## 第一部分&#10;- 要点一&#10;- 要点二&#10;&#10;## 第二部分&#10;这里可以直接粘贴 Markdown 或普通文本。"></textarea>
+
+                    <div class="row">
+                        <div>
+                            <label for="textProjectName">项目名称</label>
+                            <input type="text" id="textProjectName" placeholder="text_presentation">
+                        </div>
+                        <div>
+                            <label for="textCanvas">画布格式</label>
+                            <select id="textCanvas">
+                                <option value="ppt169" selected>PPT 16:9</option>
+                                <option value="ppt43">PPT 4:3</option>
+                                <option value="xhs">小红书 3:4</option>
+                                <option value="story">Story 9:16</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="button-row">
+                        <button class="btn btn-primary" id="textSubmit" onclick="generateFromText()">生成 PPT</button>
+                    </div>
+                </div>
+
+                <div class="progress" id="progressBox"></div>
+
+                <div class="result" id="resultBox">
+                    <h3 id="resultTitle">PPT 已生成</h3>
+                    <p id="resultMeta"></p>
+                    <p id="resultModel"></p>
+                    <p id="resultGrounding"></p>
+                    <div class="button-row" style="margin-top:12px">
+                        <a class="btn btn-primary" id="downloadLink" href="#" target="_blank" rel="noopener">下载 PPTX</a>
+                    </div>
+                    <div class="artifact-links" id="resultArtifacts"></div>
+                </div>
+
+                <div class="preview" id="previewBox">
+                    <h2 style="font-size:15px; margin-bottom:10px;">素材预览</h2>
+                    <pre id="previewText"></pre>
+                </div>
+
+                <div class="preview" id="runDetailBox">
+                    <div class="detail-grid">
+                        <div class="detail-card">
+                            <h3>本次模型与上下文配置</h3>
+                            <div class="detail-list" id="configList"></div>
+                        </div>
+                        <div class="detail-card">
+                            <h3>文件位置与中间产物</h3>
+                            <div class="detail-list" id="pathList"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="preview" id="imageBox">
+                    <h2 style="font-size:15px; margin-bottom:10px;">源图片尺寸摘要</h2>
+                    <div class="small-hint" id="imageSummary"></div>
+                    <div class="detail-list" id="imageList"></div>
+                </div>
+
+                <div class="preview" id="logBox">
+                    <h2 style="font-size:15px; margin-bottom:10px;">运行日志</h2>
+                    <div class="log-list" id="logList"></div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>本地项目</h2>
+                <p class="subtle">已有项目可以直接重新生成基础版 PPT，无需重新上传素材。</p>
+                <div class="project-list" id="projectList">
+                    {% if projects %}
+                        {% for project in projects %}
+                        <div class="project-item">
+                            <div class="project-head">
+                                <div>
+                                    <div class="project-name">{{ project.name }}</div>
+                                    <div class="project-meta">{{ project.source_count }} 个素材{% if project.exports %} · {{ project.exports|length }} 个导出{% endif %}</div>
+                                </div>
+                            </div>
+                            <div class="project-actions">
+                                <button class="btn btn-ghost btn-small" onclick="regenerateProject('{{ project.name }}')">重新生成</button>
+                                {% if project.live_preview_url %}
+                                <a class="btn btn-ghost btn-small" href="{{ project.live_preview_url }}" target="_blank" rel="noopener">打开预览</a>
+                                {% endif %}
+                                {% if project.latest_export %}
+                                <a class="btn btn-ghost btn-small" href="/api/projects/{{ project.name }}/exports/{{ project.latest_export }}">下载最新</a>
+                                {% endif %}
+                                <button class="btn btn-ghost btn-small btn-danger" onclick="deleteProject('{{ project.name }}', this)">删除项目</button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty">还没有本地项目，先在左侧上传素材。</div>
+                    {% endif %}
+                </div>
+            </div>
+        </section>
+
+        <section class="tool-layout">
+            <div class="panel">
+                <h2>PPT Master 高级工具箱</h2>
+                <p class="subtle">这里直接调用仓库脚本，覆盖项目校验、图像生成/检索、Live Preview、Visual Review、SVG 后处理、动画、音频与原生导出。</p>
+
+                <label for="toolProjectSelect">目标项目</label>
+                <select id="toolProjectSelect"></select>
+
+                <label for="toolActionSelect">工具动作</label>
+                <select id="toolActionSelect" onchange="handleToolActionChange()"></select>
+                <div class="field-hint" id="toolActionHint"></div>
+
+                <div class="conditional-control" id="toolPrimaryWrap">
+                    <label for="toolPrimaryInput" id="toolPrimaryLabel" style="margin-top:0;">主要输入</label>
+                    <input type="text" id="toolPrimaryInput">
+                </div>
+
+                <div class="conditional-control" id="toolSecondaryWrap">
+                    <label for="toolSecondaryInput" id="toolSecondaryLabel" style="margin-top:0;">次要输入</label>
+                    <input type="text" id="toolSecondaryInput">
+                </div>
+
+                <label for="toolExtraArgs">附加参数</label>
+                <input type="text" id="toolExtraArgs" placeholder="例如：--merge-paragraphs">
+                <div class="field-hint">这里的参数会安全地追加到仓库脚本的参数列表后，适合高级用法；留空则走默认命令。</div>
+
+                <div class="button-row">
+                    <button class="btn btn-primary" id="toolRunButton" onclick="runSelectedTool()">运行工具</button>
+                </div>
+
+                <div class="preview" id="toolResultBox">
+                    <h2 style="font-size:15px; margin-bottom:10px;">工具结果</h2>
+                    <pre id="toolResultText"></pre>
+                    <div class="artifact-links" id="toolArtifactLinks"></div>
+                    <div class="tool-status-line" id="toolStatusLine"></div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>模板库与原生工作流资源</h2>
+                <p class="subtle">浏览内建布局模板、品牌预设、图表模板，并导入参考 PPTX 模板。必须由 agent/workflow 接管的部分会单独标明。</p>
+
+                <label for="templateImportFile">导入参考 PPTX 模板</label>
+                <div class="dropzone" style="padding:20px 18px; text-align:left;">
+                    <input type="file" id="templateImportFile" accept=".pptx">
+                    <div><strong>选择参考 PPTX</strong></div>
+                    <div class="drop-hint">调用 `pptx_template_import.py`，产出 manifest / summary / layered SVG 参考资产。</div>
+                </div>
+
+                <div class="tool-inline">
+                    <div>
+                        <label for="templateImportName">输出名称</label>
+                        <input type="text" id="templateImportName" placeholder="默认使用 PPTX 文件名">
+                    </div>
+                    <div>
+                        <label for="templateImportArgs">附加参数</label>
+                        <input type="text" id="templateImportArgs" placeholder="--inheritance-mode both">
+                    </div>
+                </div>
+
+                <div class="button-row">
+                    <button class="btn btn-primary" id="templateImportButton" onclick="importTemplatePptx()">导入模板参考</button>
+                </div>
+
+                <div class="preview" id="templateImportResultBox">
+                    <h2 style="font-size:15px; margin-bottom:10px;">模板导入结果</h2>
+                    <pre id="templateImportResultText"></pre>
+                    <div class="artifact-links" id="templateImportArtifactLinks"></div>
+                </div>
+
+                <div class="library-heading">
+                    <h3>布局模板库</h3>
+                    <span class="small-hint" id="layoutCount"></span>
+                </div>
+                <div class="library-list" id="layoutLibrary"></div>
+
+                <div class="library-heading">
+                    <h3>品牌预设</h3>
+                    <span class="small-hint" id="brandCount"></span>
+                </div>
+                <div class="library-list" id="brandLibrary"></div>
+
+                <div class="library-heading">
+                    <h3>图表模板</h3>
+                    <span class="small-hint" id="chartCount"></span>
+                </div>
+                <div class="library-list" id="chartLibrary"></div>
+
+                <div class="library-heading">
+                    <h3>仍需 Agent / Workflow</h3>
+                </div>
+                <div class="note-list" id="agentOnlyList"></div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        let selectedFile = null;
+        let toolboxCatalog = null;
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('fileInput');
+
+        fileInput.addEventListener('change', (event) => {
+            if (event.target.files.length) {
+                selectFile(event.target.files[0]);
+            }
+        });
+
+        dropzone.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            dropzone.classList.add('drag-over');
+        });
+
+        dropzone.addEventListener('dragleave', () => {
+            dropzone.classList.remove('drag-over');
+        });
+
+        dropzone.addEventListener('drop', (event) => {
+            event.preventDefault();
+            dropzone.classList.remove('drag-over');
+            if (event.dataTransfer.files.length) {
+                selectFile(event.dataTransfer.files[0]);
+            }
+        });
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab').forEach((tab) => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach((content) => content.classList.remove('active'));
+            document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+        }
+
+        function selectFile(file) {
+            selectedFile = file;
+            document.getElementById('selectedFileName').textContent = file.name;
+            document.getElementById('selectedFileSize').textContent = formatSize(file.size);
+            document.getElementById('selectedFile').classList.add('show');
+            document.getElementById('fileSubmit').disabled = false;
+            updateFileParserVisibility();
+        }
+
+        function clearFile() {
+            selectedFile = null;
+            fileInput.value = '';
+            document.getElementById('selectedFile').classList.remove('show');
+            document.getElementById('fileSubmit').disabled = true;
+            updateFileParserVisibility();
+        }
+
+        function updateFileParserVisibility() {
+            const wrap = document.getElementById('filePdfParserWrap');
+            const select = document.getElementById('filePdfParser');
+            const isPdf = selectedFile && selectedFile.name.toLowerCase().endsWith('.pdf');
+            wrap.classList.toggle('show', Boolean(isPdf));
+            if (!isPdf) {
+                // Keep the user's current preference; default remains MinerU.
+                if (!select.value) {
+                    select.value = 'mineru';
+                }
+            }
+        }
+
+        function formatSize(bytes) {
+            if (bytes < 1024) return `${bytes} B`;
+            if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+            return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+        }
+
+        function renderProgress(steps) {
+            const progress = document.getElementById('progressBox');
+            progress.classList.add('show');
+            progress.innerHTML = steps.map((step) => `
+                <div class="step">
+                    <div class="status ${step.status}">${statusSymbol(step.status)}</div>
+                    <div>
+                        <div>${step.label}</div>
+                        ${step.detail ? `<div class="step-detail">${escapeHtml(step.detail)}</div>` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function statusSymbol(status) {
+            if (status === 'running') return '<div class="spinner"></div>';
+            if (status === 'success') return '✓';
+            if (status === 'error') return '✕';
+            return '·';
+        }
+
+        function escapeHtml(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+
+        function setBusy(button, busyText) {
+            button.dataset.originalText = button.innerHTML;
+            button.disabled = true;
+            button.innerHTML = `<div class="spinner"></div>${busyText}`;
+        }
+
+        function resetBusy(button) {
+            button.disabled = false;
+            button.innerHTML = button.dataset.originalText;
+        }
+
+        function resetResult() {
+            document.getElementById('resultBox').classList.remove('show');
+            document.getElementById('previewBox').classList.remove('show');
+            document.getElementById('progressBox').classList.remove('show');
+            document.getElementById('runDetailBox').classList.remove('show');
+            document.getElementById('imageBox').classList.remove('show');
+            document.getElementById('logBox').classList.remove('show');
+        }
+
+        function hasValue(value) {
+            return value !== null && value !== undefined && String(value).trim() !== '';
+        }
+
+        function renderProjectList(projects) {
+            const list = document.getElementById('projectList');
+            setToolProjects(projects);
+            if (!projects.length) {
+                list.innerHTML = '<div class="empty">还没有本地项目，先在左侧上传素材。</div>';
+                return;
+            }
+            list.innerHTML = projects.map((project) => `
+                <div class="project-item">
+                    <div class="project-head">
+                        <div>
+                            <div class="project-name">${escapeHtml(project.name)}</div>
+                            <div class="project-meta">${project.source_count} 个素材${project.exports?.length ? ` · ${project.exports.length} 个导出` : ''}</div>
+                            <div class="project-path">项目目录：${escapeHtml(project.path || '')}</div>
+                            ${project.latest_export_path ? `<div class="project-path">最新导出：${escapeHtml(project.latest_export_path)}</div>` : ''}
+                        </div>
+                    </div>
+                    <div class="project-actions">
+                        <button class="btn btn-ghost btn-small" onclick="regenerateProject('${project.name.replace(/'/g, "\\'")}')">重新生成</button>
+                        ${project.live_preview_url ? `<a class="btn btn-ghost btn-small" href="${project.live_preview_url}" target="_blank" rel="noopener">打开预览</a>` : ''}
+                        ${project.latest_export ? `<a class="btn btn-ghost btn-small" href="/api/projects/${project.name}/exports/${project.latest_export}">下载最新</a>` : ''}
+                        <button class="btn btn-ghost btn-small btn-danger" onclick="deleteProject('${project.name.replace(/'/g, "\\'")}', this)">删除项目</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function formatArtifacts(artifacts) {
+            if (!artifacts?.length) return '';
+            return artifacts.map((artifact) => {
+                const label = escapeHtml(artifact.name || artifact.relative_path || '打开文件');
+                if (artifact.url) {
+                    return `<a class="btn btn-ghost btn-small" href="${artifact.url}" target="_blank" rel="noopener">${label}</a>`;
+                }
+                return `<span class="btn btn-ghost btn-small" style="cursor:default;">${label}</span>`;
+            }).join('');
+        }
+
+        function renderConfigUsed(config) {
+            const box = document.getElementById('runDetailBox');
+            const list = document.getElementById('configList');
+            const items = [
+                ['画布格式', config?.canvas_format],
+                ['输出语言', config?.content_language],
+                ['解析器', config?.source_parser],
+            ].filter(([, value]) => hasValue(value));
+
+            list.innerHTML = items.map(([label, value]) => `
+                <div class="detail-item">
+                    <span class="detail-label">${escapeHtml(label)}</span>
+                    <div class="detail-value">${escapeHtml(value)}</div>
+                </div>
+            `).join('');
+            box.classList.toggle('show', Boolean(items.length));
+        }
+
+        function renderFileLocations(locations) {
+            const box = document.getElementById('runDetailBox');
+            const list = document.getElementById('pathList');
+            list.innerHTML = (locations || []).map((item) => {
+                const body = item.url
+                    ? `<a class="path-link" href="${item.url}" target="_blank" rel="noopener">${escapeHtml(item.path)}</a>`
+                    : `<div class="detail-value">${escapeHtml(item.path)}</div>`;
+                return `
+                    <div class="detail-item">
+                        <span class="detail-label">${escapeHtml(item.label || item.name || '文件')}</span>
+                        ${body}
+                    </div>
+                `;
+            }).join('');
+            if ((locations || []).length) {
+                box.classList.add('show');
+            }
+        }
+
+        function renderSourceImages(sourceImages) {
+            const box = document.getElementById('imageBox');
+            const summary = document.getElementById('imageSummary');
+            const list = document.getElementById('imageList');
+            const items = sourceImages?.items || [];
+            if (!items.length) {
+                box.classList.remove('show');
+                return;
+            }
+            const orientationLabels = {
+                landscape: '横图',
+                portrait: '竖图',
+                square: '方图',
+                unknown: '未知',
+            };
+            summary.textContent = `共 ${sourceImages.count || items.length} 张，${sourceImages.known_size_count || 0} 张已识别尺寸${sourceImages.truncated ? '，当前仅展示前几张' : ''}`;
+            list.innerHTML = items.map((item) => {
+                const sizeText = item.width && item.height ? `${item.width} × ${item.height}px` : '尺寸未知';
+                const orientation = orientationLabels[item.orientation] || item.orientation || '未知';
+                const context = item.context ? ` · ${item.context}` : '';
+                return `
+                    <div class="image-item">
+                        <span class="image-title">${escapeHtml(item.id || 'IMG')} · ${escapeHtml(item.alt || '未命名图片')}</span>
+                        <div class="image-meta">${escapeHtml(sizeText)} · ${escapeHtml(orientation)} · ${escapeHtml(item.source_file || '未知来源')}${escapeHtml(context)}</div>
+                    </div>
+                `;
+            }).join('');
+            box.classList.add('show');
+        }
+
+        function renderRunLogs(steps) {
+            const box = document.getElementById('logBox');
+            const list = document.getElementById('logList');
+            if (!steps?.length) {
+                box.classList.remove('show');
+                return;
+            }
+            list.innerHTML = steps.map((step) => {
+                const parts = [];
+                if (step.command) parts.push(`命令:\n${step.command}`);
+                if (step.cwd) parts.push(`目录:\n${step.cwd}`);
+                if (typeof step.duration_seconds !== 'undefined' && step.duration_seconds !== null) {
+                    parts.push(`耗时:\n${step.duration_seconds}s`);
+                }
+                if (step.output) parts.push(`输出:\n${step.output}`);
+                if (step.error) parts.push(`错误:\n${step.error}`);
+                return `
+                    <div class="log-entry">
+                        <div class="log-head">
+                            <strong>${escapeHtml(step.step || '步骤')}</strong>
+                            <span class="log-status">${step.success ? '成功' : '失败'}</span>
+                        </div>
+                        ${parts.length ? `<pre>${escapeHtml(parts.join('\n\n'))}</pre>` : '<div class="log-meta">无额外日志</div>'}
+                    </div>
+                `;
+            }).join('');
+            box.classList.add('show');
+        }
+
+        function renderLibraryList(containerId, entries, countId) {
+            const container = document.getElementById(containerId);
+            document.getElementById(countId).textContent = `${entries.length} 项`;
+            container.innerHTML = entries.map((entry) => `
+                <div class="library-item">
+                    <strong>${escapeHtml(entry.id)}</strong>
+                    <div class="library-summary">${escapeHtml(entry.summary || '暂无说明')}</div>
+                    ${entry.keywords?.length ? `<div class="library-meta">关键词：${escapeHtml(entry.keywords.join(' · '))}</div>` : ''}
+                    ${entry.primary_color ? `<div class="library-meta">主色：${escapeHtml(entry.primary_color)}</div>` : ''}
+                    <div class="library-path">${escapeHtml(entry.path || '')}</div>
+                </div>
+            `).join('');
+        }
+
+        function renderChartLibrary(entries) {
+            const container = document.getElementById('chartLibrary');
+            document.getElementById('chartCount').textContent = `${entries.length} 项`;
+            container.innerHTML = entries.map((entry) => `
+                <div class="library-item">
+                    <strong>${escapeHtml(entry.id)}</strong>
+                    <div class="library-summary">${escapeHtml(entry.summary || '暂无说明')}</div>
+                    <div class="library-path">${escapeHtml(entry.path || '')}</div>
+                </div>
+            `).join('');
+        }
+
+        function renderAgentOnly(features) {
+            const container = document.getElementById('agentOnlyList');
+            container.innerHTML = features.map((feature) => `
+                <div class="agent-item">
+                    <strong>${escapeHtml(feature.name)}</strong>
+                    <div class="agent-reason">${escapeHtml(feature.reason || '')}</div>
+                </div>
+            `).join('');
+        }
+
+        function setToolProjects(projects) {
+            const select = document.getElementById('toolProjectSelect');
+            if (!projects.length) {
+                select.innerHTML = '<option value="">暂无项目</option>';
+                select.disabled = true;
+                document.getElementById('toolRunButton').disabled = true;
+                return;
+            }
+            const currentValue = select.value;
+            select.innerHTML = projects.map((project) => `
+                <option value="${escapeHtml(project.name)}">${escapeHtml(project.name)}</option>
+            `).join('');
+            select.disabled = false;
+            document.getElementById('toolRunButton').disabled = false;
+            if (currentValue && projects.some((project) => project.name === currentValue)) {
+                select.value = currentValue;
+            }
+        }
+
+        function renderToolActions(actions) {
+            const select = document.getElementById('toolActionSelect');
+            select.innerHTML = actions.map((action) => `
+                <option value="${escapeHtml(action.key)}">[${escapeHtml(action.category)}] ${escapeHtml(action.label)}</option>
+            `).join('');
+            handleToolActionChange();
+        }
+
+        function currentToolAction() {
+            if (!toolboxCatalog?.actions?.length) return null;
+            const actionKey = document.getElementById('toolActionSelect').value;
+            return toolboxCatalog.actions.find((item) => item.key === actionKey) || null;
+        }
+
+        function handleToolActionChange() {
+            const action = currentToolAction();
+            const hint = document.getElementById('toolActionHint');
+            const primaryWrap = document.getElementById('toolPrimaryWrap');
+            const secondaryWrap = document.getElementById('toolSecondaryWrap');
+            const primaryLabel = document.getElementById('toolPrimaryLabel');
+            const secondaryLabel = document.getElementById('toolSecondaryLabel');
+            const primaryInput = document.getElementById('toolPrimaryInput');
+            const secondaryInput = document.getElementById('toolSecondaryInput');
+            const extraArgs = document.getElementById('toolExtraArgs');
+
+            if (!action) {
+                hint.textContent = '未加载工具动作。';
+                primaryWrap.classList.remove('show');
+                secondaryWrap.classList.remove('show');
+                extraArgs.value = '';
+                return;
+            }
+
+            hint.textContent = action.description || '';
+            primaryWrap.classList.toggle('show', Boolean(action.primary_input_label));
+            secondaryWrap.classList.toggle('show', Boolean(action.secondary_input_label));
+            primaryLabel.textContent = action.primary_input_label || '主要输入';
+            secondaryLabel.textContent = action.secondary_input_label || '次要输入';
+            primaryInput.placeholder = action.primary_input_placeholder || '';
+            secondaryInput.placeholder = action.secondary_input_placeholder || '';
+            primaryInput.value = '';
+            secondaryInput.value = '';
+            extraArgs.placeholder = action.extra_args_placeholder || '';
+            extraArgs.value = '';
+        }
+
+        function showToolResult(targetIds, data, extraStatus = '') {
+            const box = document.getElementById(targetIds.box);
+            const text = document.getElementById(targetIds.text);
+            const artifacts = document.getElementById(targetIds.artifacts);
+            const status = targetIds.status ? document.getElementById(targetIds.status) : null;
+            const parts = [];
+            if (data.label) parts.push(`动作：${data.label}`);
+            if (typeof data.returncode !== 'undefined') parts.push(`返回码：${data.returncode}`);
+            if (data.command) parts.push(`命令：\n${data.command}`);
+            if (data.cwd) parts.push(`执行目录：\n${data.cwd}`);
+            if (typeof data.duration_seconds !== 'undefined' && data.duration_seconds !== null) parts.push(`耗时：${data.duration_seconds}s`);
+            if (data.live_preview_url) parts.push(`Live Preview：${data.live_preview_url}`);
+            if (data.output_path) parts.push(`输出目录：${data.output_path}`);
+            if (data.stdout) parts.push(`stdout:\n${data.stdout}`);
+            if (data.stderr) parts.push(`stderr:\n${data.stderr}`);
+            if (data.error) parts.push(`error:\n${data.error}`);
+            text.textContent = parts.join('\n\n') || '无输出';
+            artifacts.innerHTML = formatArtifacts(data.artifacts || []);
+            if (status) {
+                status.textContent = extraStatus || (data.already_running ? '已复用现有 Live Preview 进程。' : '');
+            }
+            box.classList.add('show');
+        }
+
+        async function loadToolboxCatalog() {
+            try {
+                const response = await fetch('/api/toolbox/catalog');
+                const data = await response.json();
+                toolboxCatalog = data;
+                renderToolActions(data.actions || []);
+                renderProjectList(data.projects || []);
+                renderLibraryList('layoutLibrary', data.layouts || [], 'layoutCount');
+                renderLibraryList('brandLibrary', data.brands || [], 'brandCount');
+                renderChartLibrary(data.charts || []);
+                renderAgentOnly(data.agent_only_features || []);
+            } catch (error) {
+                console.error(error);
+                document.getElementById('toolActionHint').textContent = `工具箱加载失败：${error.message}`;
+            }
+        }
+
+        function showResult(data) {
+            document.getElementById('resultTitle').textContent = data.deck_title || 'PPT 已生成';
+            const metaParts = [`${data.project_name}`, `${data.slide_count || '-'} 页`, data.export_name];
+            if (data.source_parser) {
+                metaParts.push(`解析器 ${data.source_parser}`);
+            }
+            if (typeof data.source_image_count !== 'undefined') {
+                metaParts.push(`源图 ${data.source_image_count}`);
+            }
+            if (typeof data.placed_image_count !== 'undefined') {
+                metaParts.push(`落版图 ${data.placed_image_count}`);
+            }
+            document.getElementById('resultMeta').textContent = metaParts.join(' · ');
+            document.getElementById('resultModel').textContent = '';
+            document.getElementById('resultGrounding').textContent = '';
+            document.getElementById('downloadLink').href = data.download_url;
+            document.getElementById('resultArtifacts').innerHTML = formatArtifacts(data.artifacts || []);
+            document.getElementById('resultBox').classList.add('show');
+            if (data.source_preview) {
+                document.getElementById('previewText').textContent = data.source_preview;
+                document.getElementById('previewBox').classList.add('show');
+            }
+            renderConfigUsed(data.config_used || {});
+            renderFileLocations(data.file_locations || []);
+            renderSourceImages(data.source_images || {});
+            renderRunLogs(data.steps || []);
+        }
+
+        function normalizeSteps(serverSteps, pendingLabels) {
+            if (serverSteps?.length) {
+                return serverSteps.map((step) => ({
+                    label: step.step,
+                    status: step.success ? 'success' : 'error',
+                    detail: step.success ? (step.output || '') : (step.error || ''),
+                }));
+            }
+            return pendingLabels.map((label, index) => ({
+                label,
+                status: index === 0 ? 'running' : 'pending',
+                detail: '',
+            }));
+        }
+
+        async function runGenerationStream({
+            endpoint,
+            fetchOptions,
+            pendingLabels,
+            button = null,
+            busyText = '生成中…',
+            errorPrefix = '生成失败',
+        }) {
+            resetResult();
+            renderProgress(normalizeSteps(null, pendingLabels));
+            if (button) {
+                setBusy(button, busyText);
+            }
+
+            let resultPayload = null;
+            try {
+                const response = await fetch(endpoint, fetchOptions);
+                const contentType = response.headers.get('content-type') || '';
+
+                if (!response.ok && !contentType.includes('application/x-ndjson')) {
+                    const fallback = await response.json().catch(() => ({}));
+                    renderProgress(normalizeSteps(fallback.steps || [], []));
+                    throw new Error(fallback.error || `${errorPrefix}：HTTP ${response.status}`);
+                }
+
+                if (!response.body) {
+                    const payload = await response.json();
+                    if (!response.ok || !payload.success) {
+                        renderProgress(normalizeSteps(payload.steps || [], []));
+                        throw new Error(payload.error || errorPrefix);
+                    }
+                    resultPayload = payload;
+                } else {
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+                    let buffer = '';
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        buffer += decoder.decode(value, { stream: true });
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop() || '';
+
+                        for (const rawLine of lines) {
+                            const line = rawLine.trim();
+                            if (!line) continue;
+                            let event;
+                            try {
+                                event = JSON.parse(line);
+                            } catch (error) {
+                                console.warn('无法解析流事件', line, error);
+                                continue;
+                            }
+
+                            if (event.type === 'step') {
+                                const steps = event.steps || [];
+                                renderProgress(normalizeSteps(steps, []));
+                                renderRunLogs(steps);
+                                continue;
+                            }
+                            if (event.type === 'error') {
+                                const steps = event.steps || [];
+                                renderProgress(normalizeSteps(steps, []));
+                                renderRunLogs(steps);
+                                throw new Error(event.error || errorPrefix);
+                            }
+                            if (event.type === 'result' && event.data) {
+                                resultPayload = event.data;
+                            }
+                        }
+                    }
+
+                    if (buffer.trim()) {
+                        try {
+                            const event = JSON.parse(buffer.trim());
+                            if (event.type === 'result' && event.data) {
+                                resultPayload = event.data;
+                            }
+                        } catch (error) {
+                            console.warn('无法解析尾部流事件', buffer, error);
+                        }
+                    }
+                }
+
+                if (!resultPayload || !resultPayload.success) {
+                    throw new Error((resultPayload && resultPayload.error) || `${errorPrefix}：未收到完成事件`);
+                }
+
+                renderProgress(normalizeSteps(resultPayload.steps || [], []));
+                showResult(resultPayload);
+                refreshProjects();
+            } catch (error) {
+                alert(`${errorPrefix}：${error.message}`);
+            } finally {
+                if (button) {
+                    resetBusy(button);
+                }
+            }
+        }
+
+        async function generateFromFile() {
+            if (!selectedFile) return;
+            const button = document.getElementById('fileSubmit');
+
+            const form = new FormData();
+            form.append('file', selectedFile);
+            form.append('project_name', document.getElementById('fileProjectName').value);
+            form.append('canvas_format', document.getElementById('fileCanvas').value);
+            form.append('pdf_parser', document.getElementById('filePdfParser').value);
+
+            await runGenerationStream({
+                endpoint: '/api/upload/stream',
+                fetchOptions: { method: 'POST', body: form },
+                pendingLabels: ['转换素材', '创建项目', '导入素材', '生成 PPT'],
+                button,
+                busyText: '生成中…',
+                errorPrefix: '生成失败',
+            });
+        }
+
+        async function generateFromUrl() {
+            const button = document.getElementById('urlSubmit');
+            const url = document.getElementById('urlInput').value.trim();
+            if (!url) {
+                alert('请输入 URL');
+                return;
+            }
+            await runGenerationStream({
+                endpoint: '/api/upload-url/stream',
+                fetchOptions: {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        url,
+                        project_name: document.getElementById('urlProjectName').value,
+                        canvas_format: document.getElementById('urlCanvas').value,
+                    }),
+                },
+                pendingLabels: ['抓取网页', '创建项目', '导入素材', '生成 PPT'],
+                button,
+                busyText: '生成中…',
+                errorPrefix: '生成失败',
+            });
+        }
+
+        async function generateFromText() {
+            const button = document.getElementById('textSubmit');
+            const content = document.getElementById('textInput').value.trim();
+            if (!content) {
+                alert('请输入正文内容');
+                return;
+            }
+            await runGenerationStream({
+                endpoint: '/api/generate-text/stream',
+                fetchOptions: {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        content,
+                        project_name: document.getElementById('textProjectName').value,
+                        canvas_format: document.getElementById('textCanvas').value,
+                    }),
+                },
+                pendingLabels: ['创建项目', '写入素材', '生成 PPT'],
+                button,
+                busyText: '生成中…',
+                errorPrefix: '生成失败',
+            });
+        }
+
+        async function regenerateProject(projectName) {
+            await runGenerationStream({
+                endpoint: `/api/projects/${encodeURIComponent(projectName)}/generate/stream`,
+                fetchOptions: {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({}),
+                },
+                pendingLabels: ['生成 PPT'],
+                button: null,
+                errorPrefix: '生成失败',
+            });
+        }
+
+        async function deleteProject(projectName, button) {
+            if (!confirm(`确定删除项目 ${projectName} 吗？这会移除 projects/ 下的完整目录。`)) {
+                return;
+            }
+
+            if (button) {
+                setBusy(button, '删除中…');
+            }
+            try {
+                const response = await fetch(`/api/projects/${encodeURIComponent(projectName)}`, {
+                    method: 'DELETE',
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || '删除失败');
+                }
+                renderProjectList(data.projects || []);
+            } catch (error) {
+                alert(`删除项目失败：${error.message}`);
+            } finally {
+                if (button) {
+                    resetBusy(button);
+                }
+            }
+        }
+
+        async function runSelectedTool() {
+            const action = currentToolAction();
+            const projectName = document.getElementById('toolProjectSelect').value;
+            const button = document.getElementById('toolRunButton');
+            if (!action) {
+                alert('工具动作尚未加载完成。');
+                return;
+            }
+            if (action.requires_project && !projectName) {
+                alert('请先选择目标项目。');
+                return;
+            }
+
+            const payload = {
+                action: action.key,
+                primary_input: document.getElementById('toolPrimaryInput').value,
+                secondary_input: document.getElementById('toolSecondaryInput').value,
+                extra_args: document.getElementById('toolExtraArgs').value,
+            };
+
+            setBusy(button, '执行中…');
+            try {
+                const response = await fetch(`/api/projects/${encodeURIComponent(projectName)}/tool`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const data = await response.json();
+                showToolResult(
+                    { box: 'toolResultBox', text: 'toolResultText', artifacts: 'toolArtifactLinks', status: 'toolStatusLine' },
+                    data,
+                );
+                if (!response.ok || !data.success) {
+                    alert(`工具执行失败：${data.error || data.stderr || '未知错误'}`);
+                    return;
+                }
+                refreshProjects();
+            } catch (error) {
+                showToolResult(
+                    { box: 'toolResultBox', text: 'toolResultText', artifacts: 'toolArtifactLinks', status: 'toolStatusLine' },
+                    { error: error.message, returncode: -1 },
+                );
+                alert(`请求失败：${error.message}`);
+            } finally {
+                resetBusy(button);
+            }
+        }
+
+        async function importTemplatePptx() {
+            const button = document.getElementById('templateImportButton');
+            const fileInput = document.getElementById('templateImportFile');
+            if (!fileInput.files.length) {
+                alert('请先选择一个 PPTX 模板文件。');
+                return;
+            }
+            const form = new FormData();
+            form.append('file', fileInput.files[0]);
+            form.append('output_name', document.getElementById('templateImportName').value);
+            form.append('extra_args', document.getElementById('templateImportArgs').value);
+
+            setBusy(button, '导入中…');
+            try {
+                const response = await fetch('/api/toolbox/template-import', {
+                    method: 'POST',
+                    body: form,
+                });
+                const data = await response.json();
+                showToolResult(
+                    { box: 'templateImportResultBox', text: 'templateImportResultText', artifacts: 'templateImportArtifactLinks' },
+                    data,
+                );
+                if (!response.ok || !data.success) {
+                    alert(`模板导入失败：${data.error || data.stderr || '未知错误'}`);
+                    return;
+                }
+            } catch (error) {
+                showToolResult(
+                    { box: 'templateImportResultBox', text: 'templateImportResultText', artifacts: 'templateImportArtifactLinks' },
+                    { error: error.message, returncode: -1 },
+                );
+                alert(`请求失败：${error.message}`);
+            } finally {
+                resetBusy(button);
+            }
+        }
+
+        async function refreshProjects() {
+            try {
+                const response = await fetch('/api/projects');
+                const projects = await response.json();
+                renderProjectList(projects);
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        loadToolboxCatalog();
+    </script>
+</body>
+</html>

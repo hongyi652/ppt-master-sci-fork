@@ -1,0 +1,41 @@
+# PPT Master Example Projects
+
+> 17 curated example projects, 229 SVG presentation pages.
+
+**[Browse all examples online](https://hugohe3.github.io/ppt-master/)** — the canonical catalog, powered by [`examples.json`](./examples.json). The JSON file is the source of truth for project metadata, tags, and slide listings; this README only documents folder structure.
+
+## Project Structure
+
+Each example follows this layout:
+
+```
+<project_name>/
+├── design_spec.md       # Design specification (human-readable)
+├── spec_lock.md         # Machine-readable execution contract
+├── images/              # Image assets
+├── notes/               # Speaker notes per page
+├── svg_output/          # Original SVGs (with placeholders)
+└── svg_final/           # Final SVGs (icons + images embedded)
+```
+
+> Examples deliberately omit `sources/` (original PDFs / DOCX) and `exports/` (PPTX output) to keep repo size small. Real projects under `projects/` will have both.
+
+## Preview locally
+
+```bash
+python -m http.server --directory examples/<project_name>/svg_final 8000
+# visit http://localhost:8000
+```
+
+Or open any `svg_final/*.svg` directly in a browser / VS Code.
+
+## Contributing
+
+New examples need (1) the standard structure above and (2) an entry in [`examples.json`](./examples.json) (`projects[]` array + bumped `stats`). SVGs should pass `python3 skills/ppt-master/scripts/svg_quality_checker.py`.
+
+## Related
+
+- [Quick Start](../README.md)
+- [Workflow](../skills/ppt-master/SKILL.md)
+- [Chart Templates](../skills/ppt-master/templates/charts/)
+- [Icon Library](../skills/ppt-master/templates/icons/)

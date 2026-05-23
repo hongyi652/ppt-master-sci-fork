@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PPT Master 项目管理台</title>
+    <style>
+        :root {
+            --bg: #f3eee4;
+            --panel: rgba(255, 252, 246, 0.9);
+            --panel-strong: #fffdfa;
+            --line: rgba(37, 42, 52, 0.12);
+            --ink: #212734;
+            --muted: #657082;
+            --accent: #b95f30;
+            --accent-strong: #8c421b;
+            --success: #1e7a59;
+            --danger: #b5413c;
+            --warning: #8d6d21;
+            --shadow: 0 26px 60px rgba(28, 24, 19, 0.12);
+            --radius: 20px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            color: var(--ink);
+            font-family: "Aptos", "Segoe UI Variable", "Microsoft YaHei", sans-serif;
+            background:
+                radial-gradient(circle at top left, rgba(185, 95, 48, 0.16), transparent 28%),
+                repeating-linear-gradient(
+                    90deg,
+                    rgba(33, 39, 52, 0.03) 0,
+                    rgba(33, 39, 52, 0.03) 1px,
+                    transparent 1px,
+                    transparent 44px
+                ),
+                var(--bg);
+        }
+
+        .shell {
+            max-width: 1320px;
+            margin: 0 auto;
+            padding: 28px 18px 40px;
+        }
+
+        .hero,
+        .summary-card,
+        .filters,
+        .message,
+        .project-card {
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--panel);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(12px);
+        }
+
+        .hero {
+            display: grid;
+            grid-template-columns: 1.2fr 0.8fr;
+            gap: 18px;
+            padding: 26px;
+        }
+
+        .hero h1 {
+            margin: 0;
+            max-width: 9ch;
+            font-size: clamp(30px, 4vw, 50px);
+            line-height: 0.95;
+            letter-spacing: -0.05em;
+        }
+
+        .hero p {
+            margin: 14px 0 0;
+            max-width: 58ch;
+            color: var(--muted);
+            line-height: 1.7;
+        }
+
+        .hero-note {
+            padding: 18px;
+            border-radius: 18px;
+            background: var(--panel-strong);
+            border: 1px solid rgba(33, 39, 52, 0.08);
+        }
+
+        .hero-note strong {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--accent-strong);
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+            margin-top: 18px;
+        }
+
+        .summary-card,
+        .filters,
+        .project-card {
+            padding: 18px;
+        }
+
+        .summary-label {
+            display: block;
+            font-size: 12px;
+            color: var(--muted);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .summary-value {
+            display: block;
+            margin-top: 10px;
+            font-size: 34px;
+            letter-spacing: -0.05em;
+        }
+
+        .filters {
+            margin-top: 18px;
+        }
+
+        .row-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .row-head h2 {
+            margin: 0;
+            font-size: 18px;
+        }
+
+        .row-head p {
+            margin: 0;
+            color: var(--muted);
+        }
+
+        .filters-grid {
+            display: grid;
+            grid-template-columns: 1.3fr repeat(5, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 12px;
+            color: var(--muted);
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        input,
+        select,
+        button,
+        a {
+            font: inherit;
+        }
+
+        input,
+        select {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 14px;
+            border: 1px solid rgba(33, 39, 52, 0.12);
+            background: rgba(255, 255, 255, 0.72);
+            color: var(--ink);
+        }
+
+        input:focus,
+        select:focus {
+            outline: none;
+            border-color: rgba(185, 95, 48, 0.45);
+            box-shadow: 0 0 0 4px rgba(185, 95, 48, 0.08);
+        }
+
+        .button-row,
+        .chip-row,
+        .meta-grid,
+        .action-row,
+        .tag-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 11px 15px;
+            border-radius: 999px;
+            border: 1px solid transparent;
+            text-decoration: none;
+            cursor: pointer;
+            transition: 0.18s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+            color: #fff;
+        }
+
+        .btn-secondary {
+            background: rgba(33, 39, 52, 0.05);
+            border-color: rgba(33, 39, 52, 0.12);
+            color: var(--ink);
+        }
+
+        .btn-success {
+            background: rgba(30, 122, 89, 0.1);
+            border-color: rgba(30, 122, 89, 0.2);
+            color: var(--success);
+        }
+
+        .btn-danger {
+            background: rgba(181, 65, 60, 0.08);
+            border-color: rgba(181, 65, 60, 0.2);
+            color: var(--danger);
+        }
+
+        .btn:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .message {
+            display: none;
+            margin-top: 18px;
+            padding: 14px 18px;
+        }
+
+        .message.show {
+            display: block;
+        }
+
+        .message.success {
+            color: var(--success);
+            border-color: rgba(30, 122, 89, 0.2);
+            background: rgba(30, 122, 89, 0.08);
+        }
+
+        .message.error {
+            color: var(--danger);
+            border-color: rgba(181, 65, 60, 0.2);
+            background: rgba(181, 65, 60, 0.08);
+        }
+
+        .project-list {
+            display: grid;
+            gap: 14px;
+            margin-top: 18px;
+        }
+
+        .project-top {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            align-items: start;
+        }
+
+        .project-name {
+            margin: 0;
+            font-size: 20px;
+            letter-spacing: -0.03em;
+        }
+
+        .project-path {
+            margin-top: 8px;
+            color: var(--muted);
+            font-size: 12px;
+            word-break: break-word;
+        }
+
+        .chip-row,
+        .meta-grid,
+        .tag-row,
+        .action-row {
+            margin-top: 14px;
+        }
+
+        .chip {
+            padding: 8px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(33, 39, 52, 0.1);
+            background: rgba(33, 39, 52, 0.05);
+            font-size: 12px;
+        }
+
+        .chip.success {
+            color: var(--success);
+            border-color: rgba(30, 122, 89, 0.2);
+            background: rgba(30, 122, 89, 0.08);
+        }
+
+        .chip.warning {
+            color: var(--warning);
+            border-color: rgba(141, 109, 33, 0.2);
+            background: rgba(141, 109, 33, 0.1);
+        }
+
+        .meta-item {
+            min-width: 170px;
+            padding: 12px 14px;
+            border-radius: 16px;
+            border: 1px solid rgba(33, 39, 52, 0.08);
+            background: rgba(255, 255, 255, 0.65);
+        }
+
+        .meta-item strong {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 12px;
+            color: var(--muted);
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .tag {
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: rgba(185, 95, 48, 0.1);
+            color: var(--accent-strong);
+            font-size: 12px;
+        }
+
+        .empty {
+            padding: 36px 18px;
+            border: 1px dashed rgba(33, 39, 52, 0.18);
+            border-radius: var(--radius);
+            text-align: center;
+            color: var(--muted);
+            background: rgba(255, 255, 255, 0.45);
+        }
+
+        @media (max-width: 1080px) {
+            .hero,
+            .summary-grid,
+            .filters-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .shell {
+                padding-inline: 14px;
+            }
+
+            .hero,
+            .summary-grid,
+            .filters-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .row-head,
+            .project-top {
+                flex-direction: column;
+                align-items: stretch;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="shell">
+        <section class="hero">
+            <div>
+                <h1>PPT Master 项目管理台</h1>
+                <p>这是一个轻量管理页面，只负责历史项目筛选、Live Preview 启停和项目删除。PPT Master 正常脚本工作流、导出流程、5050 预览包装脚本都保持不变。</p>
+            </div>
+            <div class="hero-note">
+                <strong>当前能力</strong>
+                <div>按关键词、画布、源文件类型、导出状态、预览状态、最近更新时间筛选项目。</div>
+                <div style="margin-top: 8px; color: var(--muted);">每个项目可直接启动预览、关闭预览、打开预览、下载最新导出，或删除整个项目目录。</div>
+            </div>
+        </section>
+
+        <section class="summary-grid">
+            <article class="summary-card"><span class="summary-label">项目总数</span><span class="summary-value" id="totalProjects">0</span></article>
+            <article class="summary-card"><span class="summary-label">筛选结果</span><span class="summary-value" id="filteredProjects">0</span></article>
+            <article class="summary-card"><span class="summary-label">运行中预览</span><span class="summary-value" id="activePreviews">0</span></article>
+            <article class="summary-card"><span class="summary-label">已有导出</span><span class="summary-value" id="projectsWithExports">0</span></article>
+        </section>
+
+        <section class="filters">
+            <div class="row-head">
+                <h2>筛选历史项目</h2>
+                <div class="button-row">
+                    <button class="btn btn-secondary" type="button" id="resetFiltersButton">重置筛选</button>
+                    <button class="btn btn-primary" type="button" id="refreshProjectsButton">刷新列表</button>
+                </div>
+            </div>
+            <div class="filters-grid">
+                <div>
+                    <label for="keywordFilter">关键词</label>
+                    <input id="keywordFilter" type="text" placeholder="项目名 / 路径 / 源文件名">
+                </div>
+                <div>
+                    <label for="canvasFilter">画布</label>
+                    <select id="canvasFilter"><option value="">全部</option></select>
+                </div>
+                <div>
+                    <label for="sourceTypeFilter">源文件类型</label>
+                    <select id="sourceTypeFilter"><option value="">全部</option></select>
+                </div>
+                <div>
+                    <label for="exportFilter">导出状态</label>
+                    <select id="exportFilter">
+                        <option value="">全部</option>
+                        <option value="with">有导出</option>
+                        <option value="without">无导出</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="previewFilter">预览状态</label>
+                    <select id="previewFilter">
+                        <option value="">全部</option>
+                        <option value="running">预览运行中</option>
+                        <option value="stopped">预览未运行</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="updatedFilter">最近更新</label>
+                    <select id="updatedFilter">
+                        <option value="">全部</option>
+                        <option value="7">7 天内</option>
+                        <option value="30">30 天内</option>
+                        <option value="90">90 天内</option>
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <div class="message" id="messageBox"></div>
+
+        <section style="margin-top: 24px;">
+            <div class="row-head">
+                <div>
+                    <h2>历史项目</h2>
+                    <p id="projectSummary">正在加载项目列表…</p>
+                </div>
+            </div>
+            <div class="project-list" id="projectList"></div>
+        </section>
+    </main>
+
+    <script>
+        const state = {
+            projects: [],
+            filteredProjects: [],
+            busyActions: new Set(),
+        };
+
+        const filters = {
+            keyword: document.getElementById('keywordFilter'),
+            canvas: document.getElementById('canvasFilter'),
+            sourceType: document.getElementById('sourceTypeFilter'),
+            exportState: document.getElementById('exportFilter'),
+            previewState: document.getElementById('previewFilter'),
+            updatedWithin: document.getElementById('updatedFilter'),
+        };
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function busyKey(projectName, action) {
+            return `${projectName}:${action}`;
+        }
+
+        function isBusy(projectName, action) {
+            return state.busyActions.has(busyKey(projectName, action));
+        }
+
+        function setBusy(projectName, action, busy) {
+            const key = busyKey(projectName, action);
+            if (busy) {
+                state.busyActions.add(key);
+            } else {
+                state.busyActions.delete(key);
+            }
+            renderProjects();
+        }
+
+        function showMessage(text, tone = 'success') {
+            const box = document.getElementById('messageBox');
+            box.textContent = text;
+            box.className = `message show ${tone}`;
+        }
+
+        function clearMessage() {
+            const box = document.getElementById('messageBox');
+            box.textContent = '';
+            box.className = 'message';
+        }
+
+        function sortProjects(projects) {
+            return [...projects].sort((left, right) => {
+                const delta = Number(right.updated_at_ts || 0) - Number(left.updated_at_ts || 0);
+                if (delta !== 0) {
+                    return delta;
+                }
+                return left.name.localeCompare(right.name, 'zh-CN');
+            });
+        }
+
+        function renderSummary() {
+            const total = state.projects.length;
+            const filtered = state.filteredProjects.length;
+            document.getElementById('totalProjects').textContent = String(total);
+            document.getElementById('filteredProjects').textContent = String(filtered);
+            document.getElementById('activePreviews').textContent = String(state.projects.filter((project) => project.has_preview).length);
+            document.getElementById('projectsWithExports').textContent = String(state.projects.filter((project) => project.has_exports).length);
+            document.getElementById('projectSummary').textContent = !total
+                ? '当前没有历史项目。'
+                : filtered === total
+                    ? `当前展示全部 ${total} 个项目。`
+                    : `当前展示 ${filtered} / ${total} 个项目。`;
+        }
+
+        function updateFilterOptions() {
+            const canvasValues = [...new Set(state.projects.map((project) => project.canvas_format).filter(Boolean))].sort();
+            const sourceValues = [...new Set(state.projects.flatMap((project) => project.source_exts || []).filter(Boolean))].sort();
+            const currentCanvas = filters.canvas.value;
+            const currentSourceType = filters.sourceType.value;
+
+            filters.canvas.innerHTML = '<option value="">全部</option>' + canvasValues.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join('');
+            filters.sourceType.innerHTML = '<option value="">全部</option>' + sourceValues.map((value) => `<option value="${escapeHtml(value)}">.${escapeHtml(value)}</option>`).join('');
+
+            if (canvasValues.includes(currentCanvas)) {
+                filters.canvas.value = currentCanvas;
+            }
+            if (sourceValues.includes(currentSourceType)) {
+                filters.sourceType.value = currentSourceType;
+            }
+        }
+
+        function applyFilters() {
+            const keyword = filters.keyword.value.trim().toLowerCase();
+            const canvas = filters.canvas.value;
+            const sourceType = filters.sourceType.value;
+            const exportState = filters.exportState.value;
+            const previewState = filters.previewState.value;
+            const updatedWithin = Number(filters.updatedWithin.value || 0);
+            const threshold = updatedWithin ? Date.now() / 1000 - updatedWithin * 24 * 60 * 60 : 0;
+
+            state.filteredProjects = sortProjects(state.projects.filter((project) => {
+                if (keyword) {
+                    const haystack = [project.name, project.path, ...(project.source_files || [])].join(' ').toLowerCase();
+                    if (!haystack.includes(keyword)) {
+                        return false;
+                    }
+                }
+                if (canvas && project.canvas_format !== canvas) {
+                    return false;
+                }
+                if (sourceType && !(project.source_exts || []).includes(sourceType)) {
+                    return false;
+                }
+                if (exportState === 'with' && !project.has_exports) {
+                    return false;
+                }
+                if (exportState === 'without' && project.has_exports) {
+                    return false;
+                }
+                if (previewState === 'running' && !project.has_preview) {
+                    return false;
+                }
+                if (previewState === 'stopped' && project.has_preview) {
+                    return false;
+                }
+                if (threshold && Number(project.updated_at_ts || 0) < threshold) {
+                    return false;
+                }
+                return true;
+            }));
+
+            renderSummary();
+            renderProjects();
+        }
+
+        function actionButton(project, action, label, className, handlerName) {
+            const busy = isBusy(project.name, action);
+            const text = busy ? (action === 'delete' ? '删除中…' : action === 'start' ? '启动中…' : '关闭中…') : label;
+            const nameLiteral = JSON.stringify(project.name);
+            return `<button class="btn ${className}" type="button" ${busy ? 'disabled' : ''} onclick='${handlerName}(${nameLiteral})'>${text}</button>`;
+        }
+
+        function renderProjects() {
+            const list = document.getElementById('projectList');
+            if (!state.filteredProjects.length) {
+                list.innerHTML = '<div class="empty">没有符合当前筛选条件的项目。</div>';
+                return;
+            }
+
+            list.innerHTML = state.filteredProjects.map((project) => {
+                const previewChip = project.has_preview
+                    ? `<span class="chip success">Preview 运行中 · ${escapeHtml(project.live_preview_port || 5050)}</span>`
+                    : '<span class="chip warning">Preview 未运行</span>';
+                const exportChip = project.has_exports
+                    ? `<span class="chip success">${escapeHtml(project.export_count)} 个导出</span>`
+                    : '<span class="chip warning">暂无导出</span>';
+                const sourceTags = (project.source_exts || []).length
+                    ? (project.source_exts || []).map((ext) => `<span class="tag">.${escapeHtml(ext)}</span>`).join('')
+                    : '<span class="tag">无源文件</span>';
+                const previewLink = project.live_preview_url
+                    ? `<a class="btn btn-secondary" href="${escapeHtml(project.live_preview_url)}" target="_blank" rel="noopener">打开预览</a>`
+                    : '';
+                const downloadLink = project.latest_export
+                    ? `<a class="btn btn-secondary" href="/api/projects/${encodeURIComponent(project.name)}/exports/${encodeURIComponent(project.latest_export)}">下载最新</a>`
+                    : '';
+                return `
+                    <article class="project-card">
+                        <div class="project-top">
+                            <div>
+                                <h3 class="project-name">${escapeHtml(project.name)}</h3>
+                                <div class="project-path">${escapeHtml(project.path)}</div>
+                            </div>
+                            <div class="chip-row">${previewChip}${exportChip}</div>
+                        </div>
+                        <div class="meta-grid">
+                            <div class="meta-item"><strong>画布</strong><span>${escapeHtml(project.canvas_format || 'ppt169')}</span></div>
+                            <div class="meta-item"><strong>源文件</strong><span>${escapeHtml(project.source_count || 0)} 个</span></div>
+                            <div class="meta-item"><strong>最近更新</strong><span>${escapeHtml(project.updated_at || '未知')}</span></div>
+                            <div class="meta-item"><strong>创建时间</strong><span>${escapeHtml(project.created_at || '未知')}</span></div>
+                        </div>
+                        <div class="tag-row">${sourceTags}</div>
+                        <div class="action-row">
+                            ${actionButton(project, 'start', project.has_preview ? '重新连接预览' : '启动预览', 'btn-success', 'startPreview')}
+                            ${actionButton(project, 'stop', '关闭预览', 'btn-secondary', 'stopPreview')}
+                            ${previewLink}
+                            ${downloadLink}
+                            ${actionButton(project, 'delete', '删除项目', 'btn-danger', 'deleteProject')}
+                        </div>
+                    </article>`;
+            }).join('');
+        }
+
+        async function fetchJson(url, options = {}) {
+            const response = await fetch(url, options);
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || payload.success === false) {
+                throw new Error(payload.error || payload.message || `HTTP ${response.status}`);
+            }
+            return payload;
+        }
+
+        async function loadProjects({ silent = false } = {}) {
+            if (!silent) {
+                clearMessage();
+                document.getElementById('projectSummary').textContent = '正在加载项目列表…';
+            }
+            try {
+                const projects = await fetchJson('/api/projects');
+                state.projects = Array.isArray(projects) ? projects : [];
+                updateFilterOptions();
+                applyFilters();
+            } catch (error) {
+                state.projects = [];
+                state.filteredProjects = [];
+                renderSummary();
+                renderProjects();
+                showMessage(error.message, 'error');
+            }
+        }
+
+        async function startPreview(projectName) {
+            setBusy(projectName, 'start', true);
+            clearMessage();
+            try {
+                const data = await fetchJson(`/api/projects/${encodeURIComponent(projectName)}/preview/start`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({}),
+                });
+                await loadProjects({ silent: true });
+                showMessage(data.message || `已启动 ${projectName} 的预览。`, 'success');
+            } catch (error) {
+                showMessage(`启动预览失败：${error.message}`, 'error');
+            } finally {
+                setBusy(projectName, 'start', false);
+            }
+        }
+
+        async function stopPreview(projectName) {
+            setBusy(projectName, 'stop', true);
+            clearMessage();
+            try {
+                const data = await fetchJson(`/api/projects/${encodeURIComponent(projectName)}/preview/stop`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({}),
+                });
+                await loadProjects({ silent: true });
+                showMessage(data.message || `已关闭 ${projectName} 的预览。`, 'success');
+            } catch (error) {
+                showMessage(`关闭预览失败：${error.message}`, 'error');
+            } finally {
+                setBusy(projectName, 'stop', false);
+            }
+        }
+
+        async function deleteProject(projectName) {
+            if (!window.confirm(`确定删除项目 ${projectName} 吗？这会移除 projects/ 下的整个目录。`)) {
+                return;
+            }
+            setBusy(projectName, 'delete', true);
+            clearMessage();
+            try {
+                const data = await fetchJson(`/api/projects/${encodeURIComponent(projectName)}`, { method: 'DELETE' });
+                state.projects = Array.isArray(data.projects) ? data.projects : [];
+                updateFilterOptions();
+                applyFilters();
+                showMessage(data.message || `已删除 ${projectName}。`, 'success');
+            } catch (error) {
+                showMessage(`删除项目失败：${error.message}`, 'error');
+            } finally {
+                setBusy(projectName, 'delete', false);
+            }
+        }
+
+        function resetFilters() {
+            filters.keyword.value = '';
+            filters.canvas.value = '';
+            filters.sourceType.value = '';
+            filters.exportState.value = '';
+            filters.previewState.value = '';
+            filters.updatedWithin.value = '';
+            applyFilters();
+        }
+
+        Object.values(filters).forEach((element) => {
+            element.addEventListener('input', applyFilters);
+            element.addEventListener('change', applyFilters);
+        });
+
+        document.getElementById('resetFiltersButton').addEventListener('click', resetFilters);
+        document.getElementById('refreshProjectsButton').addEventListener('click', () => loadProjects());
+
+        loadProjects();
+    </script>
+</body>
+</html>
