@@ -116,6 +116,7 @@ def finalize_project(
     quiet: bool = False,
     compress: bool = False,
     max_dimension: int | None = None,
+    verbose: bool = False,
 ) -> bool:
     """
     Finalize SVG files in the project
@@ -166,7 +167,7 @@ def finalize_project(
             safe_print("[1/4] Embedding icons...")
         icons_count = 0
         for svg_file in svg_final.glob('*.svg'):
-            count = embed_icons_in_file(svg_file, icons_dir, dry_run=False, verbose=False)
+            count = embed_icons_in_file(svg_file, icons_dir, dry_run=False, verbose=verbose)
             icons_count += count
         if not quiet:
             if icons_count > 0:
@@ -191,7 +192,7 @@ def finalize_project(
             count, errs = align_and_embed_images_in_svg(
                 svg_file,
                 dry_run=False,
-                verbose=False,
+                verbose=verbose,
                 compress=compress,
                 max_dimension=max_dimension,
             )
@@ -222,7 +223,7 @@ def finalize_project(
             safe_print("[3/4] Flattening text...")
         flatten_count = 0
         for svg_file in svg_final.glob('*.svg'):
-            if process_flatten_text(svg_file, verbose=False):
+            if process_flatten_text(svg_file, verbose=verbose):
                 flatten_count += 1
         if not quiet:
             if flatten_count > 0:
@@ -236,7 +237,7 @@ def finalize_project(
             safe_print("[4/4] Converting rounded rects to Path...")
         rounded_count = 0
         for svg_file in svg_final.glob('*.svg'):
-            count = process_rounded_rect(svg_file, verbose=False)
+            count = process_rounded_rect(svg_file, verbose=verbose)
             rounded_count += count
         if not quiet:
             if rounded_count > 0:
@@ -295,6 +296,8 @@ Aliases (still accepted):
                         help='Preview only, do not execute')
     parser.add_argument('--quiet', '-q', action='store_true',
                         help='Quiet mode, reduce output')
+    parser.add_argument('--verbose', '-v', action='store_true',
+                        help='Show per-file details for each processing step')
     parser.add_argument('--compress', action='store_true',
                         help='Compress images before embedding (JPEG quality=85, PNG optimize)')
     parser.add_argument('--max-dimension', type=int, default=None,
@@ -330,7 +333,8 @@ Aliases (still accepted):
 
     success = finalize_project(args.project_dir, options, args.dry_run, args.quiet,
                                compress=args.compress,
-                               max_dimension=args.max_dimension)
+                               max_dimension=args.max_dimension,
+                               verbose=args.verbose)
     sys.exit(0 if success else 1)
 
 

@@ -314,6 +314,12 @@ class SVGQualityChecker:
                 if not self.template_mode:
                     self._check_fake_sub_superscript(content, result)
 
+                # 12. Check split-sentence anti-pattern: adjacent <text>
+                #     elements on the same line that should be one <text>
+                #     with <tspan> children for inline styling.
+                if not self.template_mode:
+                    self._check_split_sentence(content, result)
+
             # Determine pass/fail
             result['passed'] = len(result['errors']) == 0
 
@@ -1170,6 +1176,96 @@ class SVGQualityChecker:
                     f"(Tier A) or latex_to_svg.py (Tier B) per Iron Rule §4.1"
                 )
 
+    def _check_split_sentence(self, content: str, result: Dict):
+        """Detect adjacent <text> elements on the same line that form one sentence.
+
+        Anti-pattern: splitting "实现**10倍**效率提升" into three side-by-side
+        <text> elements to apply different colors/weights. This creates three
+        independent text frames in PowerPoint with fragile spacing.
+        Correct approach: one <text> with <tspan> children for inline styling.
+
+        Triggers when 3+ <text> elements share the same y-coordinate (within
+        tolerance), are sequentially positioned on x, and their combined text
+        reads as a continuous phrase (no large horizontal gaps).
+        """
+        try:
+            root = ET.fromstring(content)
+        except ET.ParseError:
+            return
+
+        text_elems: List[Dict] = []
+        for elem in root.iter():
+            local = elem.tag.split('}')[-1] if '}' in str(elem.tag) else str(elem.tag)
+            if local != 'text':
+                continue
+            x_str = elem.get('x')
+            y_str = elem.get('y')
+            if x_str is None or y_str is None:
+                continue
+            try:
+                x = float(x_str.split(',')[0].split()[0])
+                y = float(y_str.split(',')[0].split()[0])
+            except (ValueError, IndexError):
+                continue
+            text_content = ''.join(elem.itertext()).strip()
+            if not text_content:
+                continue
+            fs_raw = elem.get('font-size') or ''
+            try:
+                fs = float(fs_raw.replace('px', '').replace('pt', '').strip())
+            except (ValueError, AttributeError):
+                fs = 20.0  # reasonable default
+            text_elems.append({
+                'x': x, 'y': y, 'fs': fs, 'text': text_content,
+            })
+
+        if len(text_elems) < 3:
+            return
+
+        # Group by y-coordinate (tolerance: within 2px = same line)
+        y_tolerance = 2.0
+        text_elems.sort(key=lambda e: (e['y'], e['x']))
+        groups: List[List[Dict]] = []
+        current_group: List[Dict] = [text_elems[0]]
+        for elem in text_elems[1:]:
+            if abs(elem['y'] - current_group[0]['y']) <= y_tolerance:
+                current_group.append(elem)
+            else:
+                if len(current_group) >= 3:
+                    groups.append(current_group)
+                current_group = [elem]
+        if len(current_group) >= 3:
+            groups.append(current_group)
+
+        for group in groups:
+            group.sort(key=lambda e: e['x'])
+            # Check for sequential x-positioning (each element starts near
+            # where the previous one ends). Approximate width from char count.
+            sequential = True
+            for i in range(1, len(group)):
+                prev = group[i - 1]
+                curr = group[i]
+                approx_prev_width = len(prev['text']) * prev['fs'] * 0.6
+                gap = curr['x'] - (prev['x'] + approx_prev_width)
+                # Allow small gap or slight overlap, but flag large gaps
+                # (which indicate intentional separate columns, not a split
+                # sentence).
+                if gap > prev['fs'] * 3.0:
+                    sequential = False
+                    break
+
+            if not sequential:
+                continue
+
+            combined = ''.join(e['text'] for e in group)
+            previews = [f'"{e["text"]}"' for e in group]
+            result['warnings'].append(
+                f"Split-sentence detected: {len(group)} adjacent <text> "
+                f"elements on the same line ({' + '.join(previews)}) should "
+                f"be one <text> with <tspan> children for inline styling. "
+                f"Combined text: \"{combined[:80]}\""
+            )
+
     def _categorize_issue(self, error_msg: str) -> str:
         """Categorize issue type"""
         if 'Invalid XML' in error_msg:
@@ -1182,6 +1278,8 @@ class SVGQualityChecker:
             return 'Plain-text formula (Iron Rule §4.1)'
         elif 'Fake sub/superscript' in error_msg:
             return 'Fake sub/superscript (Iron Rule §4.1)'
+        elif 'Split-sentence' in error_msg:
+            return 'Split-sentence (use <tspan> for inline styling)'
         elif 'Banned font' in error_msg:
             return 'Banned font'
         elif 'font' in error_msg.lower():
