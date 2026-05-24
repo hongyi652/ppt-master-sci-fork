@@ -38,8 +38,8 @@ ${PYTHON} ${SKILL_DIR}/scripts/preflight_check.py <project_path>
 > **This workflow is a strict serial pipeline. The following rules have the highest priority — violating any one of them constitutes execution failure:**
 >
 > 1. **SERIAL EXECUTION** — Steps MUST be executed in order; the output of each step is the input for the next. Non-BLOCKING adjacent steps may proceed continuously once prerequisites are met, without waiting for the user to say "continue"
-> 2. **BLOCKING = HARD STOP** — Steps marked ⛔ BLOCKING require a full stop; the AI MUST wait for an explicit user response before proceeding and MUST NOT make any decisions on behalf of the user
-> 3. **NO CROSS-PHASE BUNDLING** — Cross-phase bundling is FORBIDDEN. (Note: the Eight Confirmations in Step 4 are ⛔ BLOCKING — the AI MUST present recommendations and wait for explicit user confirmation before proceeding. Once the user confirms, all subsequent non-BLOCKING steps — design spec output, SVG generation, speaker notes, and post-processing — may proceed automatically without further user confirmation)
+> 2. **BLOCKING = HARD STOP** — Steps marked ⛔ BLOCKING require a full stop. Exception: the timeout-enabled decision gates defined in Step 0 and Step 4 may wait up to 120 seconds, then auto-apply the currently recommended option(s) if the user stays silent. Outside those gates, the AI MUST wait for an explicit user response before proceeding and MUST NOT make any decisions on behalf of the user
+> 3. **NO CROSS-PHASE BUNDLING** — Cross-phase bundling is FORBIDDEN. (Note: the Eight Confirmations in Step 4 are ⛔ BLOCKING — the AI MUST present recommendations and wait for explicit user confirmation, or for the 120-second timeout fallback to accept the recommended bundle, before proceeding. Once the bundle is confirmed or the timeout fallback is applied, all subsequent non-BLOCKING steps — design spec output, SVG generation, speaker notes, and post-processing — may proceed automatically without further user confirmation)
 > 4. **GATE BEFORE ENTRY** — Each Step has prerequisites (🚧 GATE) listed at the top; these MUST be verified before starting that Step
 > 5. **NO SPECULATIVE EXECUTION** — "Pre-preparing" content for subsequent Steps is FORBIDDEN (e.g., writing SVG code during the Strategist phase)
 > 6. **NO SUB-AGENT SVG GENERATION** — Executor Step 6 SVG generation is context-dependent and MUST be completed by the current main agent end-to-end. Delegating page SVG generation to sub-agents is FORBIDDEN
@@ -70,6 +70,7 @@ ${PYTHON} ${SKILL_DIR}/scripts/preflight_check.py <project_path>
 > - **Template format**: `design_spec.md` MUST follow its original English template structure (section headings, field names) regardless of conversation language. Content values may be in the user's language.
 > - **Deck text language is explicit — ASK FIRST**: Strategist MUST proactively ask the user which language the PPT copy should use **before** presenting the Eight Confirmations bundle (e.g. Chinese / English / bilingual). This is the very first question in the pipeline. Do not infer from chat language alone; do not skip it.
 > - **Default deck language**: when the user has not specified a deck-copy language, Strategist MUST recommend `zh-CN` as the default option. Switch to another language only on explicit user choice or when the source task clearly requires it.
+> - **Timed fallback for the language gate**: the language question is timeout-enabled. After presenting the options and the recommendation, wait up to 120 seconds. If the user does not answer, lock the recommended language (`zh-CN` unless another recommendation is explicitly justified by the source task) and continue. When continuing, explicitly state that the timeout fallback was applied.
 > - **Light background by default**: unless the user **explicitly** requests a dark background (e.g. "用深色背景" / "dark background" / "dark tech style with dark bg"), every deck MUST use a light (white or near-white) page background. Merely choosing a "dark tech" visual style does NOT automatically trigger a dark background — the background stays light unless the user says otherwise. Record this in `design_spec.md §II` and `spec_lock.md`.
 
 > [!IMPORTANT]
@@ -134,6 +135,15 @@ Before starting the pipeline, ask the user:
 > **执行模式选择 / Execution Mode**:
 > 1. **一键执行模式 (One-click)** — 全流程自动执行，中间只在八次确认（Step 4）暂停等待用户确认，其余步骤（文件读写、脚本运行、SVG 生成、后处理、导出）全部自动完成，不再逐一请求权限。
 > 2. **逐步确认模式 (Step-by-step)** — 每个文件操作和命令执行都向用户请求权限后再执行（默认行为）。
+
+**Recommendation**: explicitly recommend one mode before waiting.
+
+| Runtime condition | Recommended mode |
+|---|---|
+| Host already has auto-approve / pre-granted tool permissions enabled | One-click |
+| Auto-approve is unavailable, disabled, or unknown | Step-by-step |
+
+**Timeout policy**: this question is timeout-enabled. After presenting both options and the recommendation, wait up to 120 seconds. If the user does not choose, continue with the recommended mode and explicitly state that the timeout fallback was applied.
 
 **If the user chooses one-click mode**:
 
@@ -338,7 +348,9 @@ Read references/strategist.md
 
 **Eight Confirmations** (full template: `templates/design_spec_reference.md`):
 
-⛔ **BLOCKING**: present the Eight Confirmations as a single bundled recommendation set and **wait for explicit user confirmation or modification** before outputting Design Specification & Content Outline. This is the single core confirmation point — once confirmed, all subsequent steps proceed automatically.
+**Language timeout policy**: before presenting the bundled eight items, ask the deck-copy language first, recommend a concrete default (`zh-CN` unless the source clearly justifies another language), and wait up to 120 seconds. If the user does not answer, lock the recommended language and continue to the bundle. Explicitly state when this timeout fallback is applied.
+
+⛔ **BLOCKING (120-second fallback enabled)**: present the Eight Confirmations as a single bundled recommendation set and wait for explicit user confirmation or modification before outputting Design Specification & Content Outline. If the user does not respond within 120 seconds, treat the full recommended set as accepted, explicitly say that the timeout fallback was applied, and proceed. This is the single core confirmation point — once confirmed or auto-accepted by timeout, all subsequent steps proceed automatically.
 
 1. Canvas format
 2. Page count range
@@ -374,7 +386,7 @@ ${PYTHON} ${SKILL_DIR}/scripts/analyze_images.py <project_path>/images
 **✅ Checkpoint — Phase deliverables complete, auto-proceed to next step**:
 ```markdown
 ## ✅ Strategist Phase Complete
-- [x] Eight Confirmations completed (user confirmed)
+- [x] Eight Confirmations completed (user confirmed or 120-second timeout fallback applied)
 - [x] Split-mode note appended below the eight items (heavy or normal variant)
 - [x] Design Specification & Content Outline generated
 - [x] Execution lock (spec_lock.md) generated

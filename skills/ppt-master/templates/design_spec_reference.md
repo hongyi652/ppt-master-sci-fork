@@ -14,7 +14,7 @@
 | **Design Style** | {design_style} |
 | **Target Audience** | [Filled by Strategist] |
 | **Use Case** | [Filled by Strategist] |
-| **Content Language** | [Explicit user confirmation, e.g. `zh-CN`, `en-US`, `bilingual (zh-CN primary)`] |
+| **Content Language** | [User-confirmed value or timeout-applied default, e.g. `zh-CN`, `en-US`, `bilingual (zh-CN primary)`] |
 | **Created Date** | {date_str} |
 
 ---

@@ -78,6 +78,9 @@ _SLIDE_CACHE: dict = {}  # path -> (mtime, (content, warnings))
 _LIST_CACHE_LOCK = threading.Lock()
 _LIST_CACHE: dict = {}  # path -> (mtime, annotation_count_on_disk)
 
+_IMAGE_ALIAS_CACHE_LOCK = threading.Lock()
+_IMAGE_ALIAS_CACHE: dict = {}  # images_dir -> ((image_manifest_mtime, formula_manifest_mtime), alias_map)
+
 _PAGE_REF_RE = re.compile(r'^\s*-\s*P(\d+)\s*:', re.MULTILINE)
 _PAGE_COUNT_RE = re.compile(r'\|\s*\*\*Page Count\*\*\s*\|\s*([^|\r\n]+)\|', re.IGNORECASE)
 
@@ -234,6 +237,118 @@ def _safe_mtime(path: Path) -> float:
         return path.stat().st_mtime
     except OSError:
         return 0.0
+
+
+def _normalize_request_relative_path(value: str) -> Optional[str]:
+    """Validate and normalize a client-requested path relative to images/."""
+    candidate = value.strip().replace('\\', '/')
+    if not candidate or candidate.startswith('/'):
+        return None
+    parts = candidate.split('/')
+    if any(part in ('', '.', '..') or ':' in part for part in parts):
+        return None
+    return '/'.join(parts)
+
+
+def _normalize_manifest_relative_path(value: object) -> Optional[str]:
+    """Normalize manifest paths to images/-relative paths."""
+    if not isinstance(value, str):
+        return None
+    candidate = value.strip().replace('\\', '/')
+    if not candidate:
+        return None
+    while candidate.startswith('./'):
+        candidate = candidate[2:]
+    if candidate.startswith('../images/'):
+        candidate = candidate[len('../images/'):]
+    elif candidate.startswith('images/'):
+        candidate = candidate[len('images/'):]
+    return _normalize_request_relative_path(candidate)
+
+
+def _resolve_relative_file(root_dir: Path, relative_path: str) -> Optional[Path]:
+    """Resolve a relative path under *root_dir*, rejecting traversal."""
+    try:
+        target = (root_dir / relative_path).resolve()
+        target.relative_to(root_dir.resolve())
+    except ValueError:
+        return None
+    return target
+
+
+def _load_json_file(path: Path):
+    """Load JSON from disk best-effort."""
+    try:
+        return json.loads(path.read_text(encoding='utf-8'))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _build_image_alias_map(images_dir: Path) -> dict[str, str]:
+    """Build short_alias -> actual file mappings from asset manifests."""
+    alias_map: dict[str, str] = {}
+
+    image_manifest = _load_json_file(images_dir / 'image_manifest.json')
+    if isinstance(image_manifest, list):
+        for entry in image_manifest:
+            if not isinstance(entry, dict):
+                continue
+            alias = _normalize_manifest_relative_path(entry.get('short_alias'))
+            target = _normalize_manifest_relative_path(
+                entry.get('filename') or entry.get('original_filename'),
+            )
+            if alias and target:
+                alias_map.setdefault(alias, target)
+
+    formula_manifest = _load_json_file(images_dir / 'formula_manifest.json')
+    formulas = formula_manifest
+    if isinstance(formula_manifest, dict):
+        formulas = formula_manifest.get('formulas')
+    if isinstance(formulas, list):
+        for entry in formulas:
+            if not isinstance(entry, dict):
+                continue
+            alias = _normalize_manifest_relative_path(entry.get('short_alias'))
+            target = _normalize_manifest_relative_path(
+                entry.get('svg_path') or entry.get('filename'),
+            )
+            if alias and target:
+                alias_map.setdefault(alias, target)
+
+    return alias_map
+
+
+def _get_image_alias_map(images_dir: Path) -> dict[str, str]:
+    """Return cached short_alias mappings for *images_dir*."""
+    cache_key = str(images_dir)
+    version = (
+        _safe_mtime(images_dir / 'image_manifest.json'),
+        _safe_mtime(images_dir / 'formula_manifest.json'),
+    )
+    with _IMAGE_ALIAS_CACHE_LOCK:
+        entry = _IMAGE_ALIAS_CACHE.get(cache_key)
+        if entry is not None and entry[0] == version:
+            return entry[1]
+
+    alias_map = _build_image_alias_map(images_dir)
+    with _IMAGE_ALIAS_CACHE_LOCK:
+        _IMAGE_ALIAS_CACHE[cache_key] = (version, alias_map)
+    return alias_map
+
+
+def _resolve_image_file(images_dir: Path, request_path: str) -> Optional[Path]:
+    """Resolve an image request to an on-disk file, including alias fallback."""
+    target = _resolve_relative_file(images_dir, request_path)
+    if target is not None and target.is_file():
+        return target
+
+    mapped_path = _get_image_alias_map(images_dir).get(request_path)
+    if not mapped_path:
+        return None
+    target = _resolve_relative_file(images_dir, mapped_path)
+    if target is None or not target.is_file():
+        return None
+    return target
 
 
 def _count_files(directory: Path, pattern: str) -> int:
@@ -586,21 +701,22 @@ def create_app(
 
     @app.route('/images/<path:filename>')
     def serve_image(filename: str):
-        """Serve images referenced by SVGs as `../images/*.png`.
-
-        Resolution against an absolute images_dir + relative_to() check is the
-        authoritative path-traversal guard.
-        """
+        """Serve images referenced by SVGs, including manifest short aliases."""
         if not images_dir.exists():
             return jsonify({'error': 'images directory not found'}), 404
-        target = (images_dir / filename).resolve()
-        try:
-            target.relative_to(images_dir.resolve())
-        except ValueError:
+
+        normalized = _normalize_request_relative_path(filename)
+        if normalized is None:
             return jsonify({'error': 'invalid path'}), 400
-        if not target.exists() or not target.is_file():
+
+        target = _resolve_image_file(images_dir, normalized)
+        if target is None:
             return jsonify({'error': 'not found'}), 404
-        return send_from_directory(str(images_dir), filename)
+
+        return send_from_directory(
+            str(images_dir),
+            target.relative_to(images_dir.resolve()).as_posix(),
+        )
 
     @app.route('/assets/<path:filename>')
     def serve_asset(filename: str):

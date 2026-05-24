@@ -15,7 +15,7 @@
 ## language
 - content_language: zh-CN
 
-> Strategist: fill the confirmed deck-copy language here. Examples: `zh-CN`, `en-US`, `bilingual (zh-CN primary, English technical terms preserved)`. Executor must keep all newly written slide text in this language unless the user explicitly asks for code-switching on a specific page.
+> Strategist: fill the confirmed deck-copy language here. Use the user-confirmed value when available; otherwise use the 120-second timeout fallback result. Examples: `zh-CN`, `en-US`, `bilingual (zh-CN primary, English technical terms preserved)`. Executor must keep all newly written slide text in this language unless the user explicitly asks for code-switching on a specific page.
 
 ## colors
 - bg: #FFFFFF

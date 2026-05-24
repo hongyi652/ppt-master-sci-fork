@@ -223,7 +223,6 @@
             display: none;
         }
 
-        .fullscreen-overlay object,
         .fullscreen-overlay img {
             width: 95vw;
             height: 90vh;
@@ -259,7 +258,7 @@
             max-width: 100%;
         }
 
-        .theater-mode .slide-container object {
+        .theater-mode .slide-container img {
             max-height: 75vh;
             width: auto;
             margin: 0 auto;
@@ -271,7 +270,7 @@
                 max-width: 90vw !important;
             }
 
-            .slide-container object {
+            .slide-container img {
                 max-height: 70vh;
             }
         }
@@ -292,11 +291,12 @@
             color: #fff;
         }
 
-        /* SVG object styling */
-        .slide-container object {
+        /* SVG slide styling */
+        .slide-container img {
             width: 100%;
             height: auto;
             min-height: 400px;
+            object-fit: contain;
         }
     </style>
 </head>
@@ -408,10 +408,8 @@
                 <!-- Main Slide -->
                 <div class="main-slide-area flex-1">
                     <div class="glass rounded-2xl p-4 slide-container">
-                        <object id="mainSlide" data="" type="image/svg+xml"
+                        <img id="mainSlide" src="" alt="Slide"
                             class="w-full rounded-lg fade-in cursor-pointer" onclick="toggleFullscreen()">
-                            <p class="text-center text-gray-500 py-10">Loading SVG...</p>
-                        </object>
                     </div>
 
                     <!-- Navigation Controls -->
@@ -494,9 +492,7 @@
             class="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-colors">
             <i class="fas fa-chevron-left"></i>
         </button>
-        <object id="fullscreenImage" data="" type="image/svg+xml" class="fade-in">
-            <p>Loading SVG...</p>
-        </object>
+        <img id="fullscreenImage" src="" alt="Slide" class="fade-in">
         <button onclick="event.stopPropagation(); nextSlide()"
             class="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-colors">
             <i class="fas fa-chevron-right"></i>
@@ -575,9 +571,8 @@
                 return `
                 <a href="${collectionUrl}" data-collection-id="${collection.id}" class="collection-card rounded-xl overflow-hidden" style="background: var(--surface);">
                     <div class="relative" style="aspect-ratio: 16 / 9; background: var(--darker); border-bottom: 1px solid var(--border);">
-                        <object data="${coverPath}" type="image/svg+xml" class="w-full h-full object-contain" style="pointer-events:none">
-                            <div class="w-full h-full flex items-center justify-center text-3xl" style="opacity: 0.5;">${collection.icon}</div>
-                        </object>
+                        <img src="${coverPath}" alt="${collection.title}" class="w-full h-full object-contain" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                        <div class="w-full h-full items-center justify-center text-3xl" style="display:none;opacity:0.5;position:absolute;top:0;left:0;">${collection.icon}</div>
                         <div class="absolute bottom-3 right-3 px-2.5 py-1 rounded-md text-xs font-medium"
                              style="background: rgba(13, 13, 15, 0.85); color: var(--text); border: 1px solid var(--border); backdrop-filter: blur(8px);">
                             ${collection.slides.length} slides
@@ -744,9 +739,7 @@
                 <div class="thumbnail rounded-lg overflow-hidden border-2 ${index === 0 ? 'border-brand-500' : 'border-transparent'}" 
                      onclick="goToSlide(${index})" 
                      id="thumb-${index}">
-                    <object data="${slidePath}" type="image/svg+xml" class="w-full" style="pointer-events:none">
-                        <div class="w-full h-16 flex items-center justify-center bg-gray-100">📄</div>
-                    </object>
+                    <img src="${slidePath}" alt="${slide.title}" class="w-full">
                     <div class="px-2 py-1 bg-gray-50 text-xs text-gray-600 truncate">
                         ${index + 1}. ${slide.title}
                     </div>
@@ -766,9 +759,7 @@
                 return `
                 <div class="glass rounded-xl p-2 shadow-md hover:shadow-lg transition-shadow cursor-pointer" 
                      onclick="goToSlide(${index}); window.scrollTo({top: 0, behavior: 'smooth'})">
-                    <object data="${slidePath}" type="image/svg+xml" class="w-full rounded-lg" style="pointer-events:none">
-                        <div class="w-full h-24 flex items-center justify-center bg-gray-100">📄</div>
-                    </object>
+                    <img src="${slidePath}" alt="${slide.title}" class="w-full rounded-lg">
                     <div class="mt-2 px-1">
                         <p class="text-sm font-medium text-gray-800 truncate">${index + 1}. ${slide.title}</p>
                         <p class="text-xs text-gray-500 truncate">${slide.desc}</p>
@@ -792,10 +783,10 @@
             mainSlide.classList.remove('fade-in');
             void mainSlide.offsetWidth;
             mainSlide.classList.add('fade-in');
-            mainSlide.data = slidePath;
+            mainSlide.src = slidePath;
 
             // Update fullscreen
-            fullscreenImage.data = slidePath;
+            fullscreenImage.src = slidePath;
 
             // Update page numbers
             document.getElementById('currentPage').textContent = currentSlide + 1;
