@@ -33,6 +33,7 @@ One offending character invalidates the file and aborts export. Numeric refs (`&
 | `@font-face` | Custom font declarations |
 | `<animate*>` / `<set>` | SVG animations |
 | `<script>` / event attributes | Scripts and interactivity |
+| `--` inside `<!-- -->` | XML forbids double-hyphen inside comments. Write `<!-- formula range -->` not `<!-- 10^-11 -- 10^-9 -->`. The parser aborts on the illegal token. |
 | `<iframe>` | Embedded frames |
 
 > **`marker-start` / `marker-end` is conditionally allowed** — see §1.1 for constraints. The converter maps qualifying markers to native DrawingML `<a:headEnd>` / `<a:tailEnd>`.
@@ -173,81 +174,60 @@ One offending character invalidates the file and aborts export. Numeric refs (`&
 - **Fonts**: every `font-family` stack MUST end with a pre-installed family (Microsoft YaHei / SimSun / Arial / Times New Roman / Consolas …); `@font-face` is FORBIDDEN. **⛔ 楷体 (`KaiTi`) is BANNED** — do not use in any font stack. **CJK-first metric rule**: when the primary font is CJK, put it FIRST — the converter uses it for both `<a:latin>` and `<a:ea>` slots to prevent size/alignment mismatch between Latin and CJK characters in mixed text. Full rule: [`strategist.md §g`](strategist.md).
 - **Styles**: inline only (`fill=""`, `font-size=""`); `<style>`/`class` FORBIDDEN (`id` inside `<defs>` is fine)
 - **Colors**: HEX only; transparency via `fill-opacity`/`stroke-opacity`
-- **Images**: `<image href="../images/xxx.png" preserveAspectRatio="xMidYMid meet"/>` by default; use `slice` only for rows marked `Display mode: crop-ok`.
+- **Images**: `<image href="../images/xxx.png" preserveAspectRatio="xMidYMid meet"/>` by default; use `slice` only for rows marked `Display mode: crop-ok`. **⛔ `preserveAspectRatio="none"` is FORBIDDEN** on content-bearing images — it stretches/distorts originals. The only allowed exception is a full-bleed background image at `x="0" y="0"` covering the entire canvas. `svg_quality_checker.py` flags violations as blocking errors.
 - **Formula SVGs — NO PLAIN-TEXT FORMULAS**: see §4.1 below. Any mathematical notation in `<text>` is a **blocking error**.
 - **Icons**: `<use data-icon="<library>/<name>" x="" y="" width="48" height="48" fill="#HEX"/>` (auto-embedded post-processing). Always include library prefix. One stylistic library per deck (`chunk-filled`/`tabler-filled`/`tabler-outline`/`phosphor-duotone`); `simple-icons` only for real brand marks. See [`../templates/icons/README.md`](../templates/icons/README.md).
 
 ### 4.1 Iron Rule — No Plain-Text Formulas or Mathematical Notation
 
-> **IRON RULE**: Mathematical expressions MUST NOT appear as raw plain-text approximations (e.g. `a_1`, `x^2`, `a/b`, `√x`) inside `<text>` / `<tspan>`. The converter supports **two rendering paths** — choose by complexity:
+> **IRON RULE**: Mathematical expressions MUST NOT appear as raw plain-text approximations (e.g. `a_1`, `x^2`, `a/b`, `√x`) inside `<text>` / `<tspan>`. **Never split a formula across multiple `<text>` elements** — no separate text boxes for base and exponent/subscript.
 >
-> | Tier | When to use | Rendering path |
-> |------|-------------|----------------|
-> | **Tier A — Native sub/superscript** | Single-level subscript OR superscript on 1–3 characters (chemical formulas, simple variable names, unit exponents) | `<tspan baseline-shift="sub/super" font-size="70%">` inside the parent `<text>` |
-> | **Tier B — Formula SVG image** | Fractions, radicals, integrals, multi-level nesting, full equations, anything beyond a simple sub/super | `latex_to_svg.py` → `<image href="../images/formula_*.svg">` |
+> **SVG-FIRST POLICY**: ALL formulas — including simple sub/superscripts like 10², H₂O, Tₑ — default to **Tier B (SVG image)**. Generate via `latex_to_svg.py`, embed as `<image>`. Tier A (baseline-shift) is a narrow exception, not the default.
 >
-> Writing a formula-like pattern as bare text (no `baseline-shift`, no `<image>`) is a **blocking error**.
+> | Tier | Priority | When to use | Rendering path |
+> |------|----------|-------------|----------------|
+> | **Tier B — Formula SVG image (DEFAULT)** | ★ Use first | **All formulas by default**: sub/superscripts, chemical formulas, unit exponents, fractions, equations — everything | `latex_to_svg.py` → `<image href="../images/formula_*.svg">` |
+> | **Tier A — Native baseline-shift (EXCEPTION)** | Narrow exception | ONLY when ALL conditions met: (a) single sub/super of 1–2 chars, (b) inline in a prose sentence where `<image>` would break text flow, (c) max 1 Tier A per page | `<tspan baseline-shift="sub/super" font-size="70%">` inside the parent `<text>` |
+>
+> Writing a formula-like pattern as bare text (no `<image>`, no `baseline-shift`) is a **blocking error**.
 
-#### Tier A — Native Sub/Superscript via `baseline-shift`
+#### Tier B — Formula SVG Image via `latex_to_svg.py` (DEFAULT)
 
-`svg_to_pptx.py` maps `baseline-shift="sub"` → DrawingML `baseline="-25000"` and `baseline-shift="super"` → DrawingML `baseline="30000"`, producing native PowerPoint subscripts/superscripts that are editable, font-consistent, and properly positioned.
+**This is the primary and preferred rendering path for ALL formulas.**
 
-**Use Tier A when ALL of the following are true**:
+Every formula-like expression — whether simple (`10²`, `H₂O`, `m²`) or complex (`∫₀^∞`, `ρ_L = v_⊥/ω_c`) — should be rendered as a SVG image unless it meets the narrow Tier A exception criteria below.
 
-1. Only a single level of subscript OR superscript (not both simultaneously on the same base)
-2. The sub/superscript content is 1–3 characters (digits, single letters, `+`, `-`)
-3. No fraction bar, radical, integral, sum, or other structural math operator is involved
+**Tier B examples** (generate SVG for all of these):
 
-**Tier A examples** (use `baseline-shift`):
-
-| Expression | SVG markup |
-|---|---|
-| H₂O | `H<tspan baseline-shift="sub" font-size="70%">2</tspan>O` |
-| CO₂ | `CO<tspan baseline-shift="sub" font-size="70%">2</tspan>` |
-| Fe³⁺ | `Fe<tspan baseline-shift="super" font-size="70%">3+</tspan>` |
-| 10⁻⁹ s | `10<tspan baseline-shift="super" font-size="70%">-9</tspan> s` |
-| Tₑ | `T<tspan baseline-shift="sub" font-size="70%">e</tspan>` |
-| nₑ | `n<tspan baseline-shift="sub" font-size="70%">e</tspan>` |
-| m² | `m<tspan baseline-shift="super" font-size="70%">2</tspan>` |
-| cm⁻³ | `cm<tspan baseline-shift="super" font-size="70%">-3</tspan>` |
-
-**Recommended template** — inline subscript in a sentence:
-
-```xml
-<text x="100" y="300" font-size="20" fill="#333333">
-  电子密度 n<tspan baseline-shift="sub" font-size="70%">e</tspan> 的典型值为 10<tspan baseline-shift="super" font-size="70%">19</tspan> m<tspan baseline-shift="super" font-size="70%">-3</tspan>
-</text>
-```
-
-**Tier A constraints**:
-
-- `font-size="70%"` (or 65%–75%) is mandatory — without it, the shifted text stays at full size and looks wrong.
-- Inline tspans with `baseline-shift` must NOT carry `x`/`y`/`dy` — they are inline runs, not line breaks.
-- Do NOT nest `baseline-shift` (no sub-of-sub or super-of-sub) — use Tier B for such cases.
-- Unicode sub/superscript characters (`²`, `³`, `₂`, `ₑ`, etc.) are allowed as a shorthand for Tier A when coverage permits, but `baseline-shift` is preferred for consistency and full character coverage.
-
-#### Tier B — Formula SVG Image via `latex_to_svg.py`
-
-**Use Tier B for anything beyond simple single-level sub/superscripts**:
-
-| Category | Examples | Why not Tier A |
+| Expression | LaTeX | Command |
 |---|---|---|
-| **Fractions** | a/b, ΔT/Δt, dN/dt | Requires `\frac{}{}` vertical stacking |
-| **Square roots / radicals** | √x, √(2πkT/m) | No SVG text equivalent |
-| **Summation / product / integral** | ∑_{i=1}^{n}, ∫_0^∞ | Multi-level + operator |
-| **Mixed sub + superscripts on same base** | x_i^2, T_e^{3/2} | Two levels simultaneously |
-| **Full equations** | E=mc², ρ_L = v_⊥/ω_c, PV=nRT | Multiple terms with operators |
-| **Limit / log / trig with notation** | lim_{x→0}, sin²θ | Structural notation |
-| **Set / logic notation** | x ∈ ℝ, A ∩ B | Specialized operators |
-| **Vector / matrix notation** | →v, ‖x‖, A⁻¹ | Structural decoration |
-| **Complex chemical reactions** | 2H₂ + O₂ → 2H₂O | Multi-term equation |
-| **Multi-term expressions** | α + β = γ, Φ(x) = ... | Equation structure |
+| 10² | `10^{2}` | `latex_to_svg.py "10^{2}" -o .../formula_inline_901.svg` |
+| H₂O | `\mathrm{H_2O}` | `latex_to_svg.py "\mathrm{H_2O}" -o .../formula_inline_902.svg` |
+| Tₑ | `T_e` | `latex_to_svg.py "T_e" -o .../formula_inline_903.svg` |
+| 10⁻⁹ s | `10^{-9}\;\mathrm{s}` | `latex_to_svg.py "10^{-9}\;\mathrm{s}" -o .../formula_inline_904.svg` |
+| CO₂ | `\mathrm{CO_2}` | `latex_to_svg.py "\mathrm{CO_2}" -o .../formula_inline_905.svg` |
+| nₑ | `n_e` | `latex_to_svg.py "n_e" -o .../formula_inline_906.svg` |
+| cm⁻³ | `\mathrm{cm}^{-3}` | `latex_to_svg.py "\mathrm{cm}^{-3}" -o .../formula_inline_907.svg` |
+| ρ_L = v_⊥/ω_c | `\rho_L = \frac{v_\perp}{\omega_c}` | `latex_to_svg.py "\rho_L = ..." -o .../formula_inline_908.svg` |
+| ∫₀^∞ f(x)dx | `\int_0^\infty f(x)\,dx` | `latex_to_svg.py "\int_0^\infty ..." -o .../formula_inline_909.svg` |
+
+**Tier B categories** (non-exhaustive — when in doubt, use Tier B):
+
+| Category | Examples |
+|---|---|
+| **Any sub/superscript** | 10², H₂O, Tₑ, m², cm⁻³, Fe³⁺ |
+| **Fractions** | a/b, ΔT/Δt, dN/dt |
+| **Radicals** | √x, √(2πkT/m) |
+| **Summation / integral** | ∑_{i=1}^{n}, ∫_0^∞ |
+| **Full equations** | E=mc², PV=nRT, ρ_L = v_⊥/ω_c |
+| **Mixed sub + super** | x_i², T_e^{3/2} |
+| **Chemical reactions** | 2H₂ + O₂ → 2H₂O |
 
 **Tier B procedure** (per page, before writing SVG):
 
 ```
 FOR each text string planned for this page:
-    1. Does it contain a fraction, radical, integral, sum, multi-level sub/super, or equation?
+    1. Does it contain ANY formula-like expression (sub/super, fraction, equation, etc.)?
        → YES: Tier B — proceed to step 2
     2. CONVERT to SVG image:
        a. Check formula_manifest.json / image_asset_table.md for existing formula_*.svg
@@ -256,26 +236,111 @@ FOR each text string planned for this page:
           python3 ${SKILL_DIR}/scripts/latex_to_svg.py "<latex>" -o <project>/images/formula_inline_<NNN>.svg
           (counter <NNN> from 901, incrementing)
        d. Embed the generated SVG as <image>
-    3. NEVER fall back to plain text. If latex_to_svg.py fails, surface the error and stop.
+    3. NEVER fall back to plain text or Tier A without meeting ALL exception criteria.
+       If latex_to_svg.py fails, surface the error and stop.
 ```
+
+#### Tier A — Native Sub/Superscript via `baseline-shift` (EXCEPTION ONLY)
+
+> **⚠️ Tier A is NOT the default.** Use it ONLY when ALL of the following conditions are met simultaneously. If ANY condition fails, use Tier B.
+
+**ALL conditions required for Tier A**:
+
+1. Single sub OR super of **1–2 characters only** (e.g. `²`, `e`, `2`, `-3`)
+2. The expression appears **inline in a prose sentence** where replacing it with `<image>` would break the text flow (e.g. "扩散系数 D 的单位为 m²/s" — the `²` is part of running text)
+3. **Maximum 1 Tier A expression per page** — if the page has more than one formula, ALL must use Tier B for consistency
+4. No fraction, radical, integral, or multi-level nesting
+
+`svg_to_pptx.py` maps `baseline-shift="sub"` → DrawingML `baseline="-25000"` and `baseline-shift="super"` → DrawingML `baseline="30000"`.
+
+**Tier A markup** (for the rare cases that qualify):
+
+```xml
+<text x="100" y="300" font-size="20" fill="#333333">
+  扩散系数单位为 m<tspan baseline-shift="super" font-size="70%">2</tspan>/s
+</text>
+```
+
+**Tier A constraints**:
+
+- `font-size="70%"` (or 65%–75%) is mandatory.
+- Inline tspans with `baseline-shift` must NOT carry `x`/`y`/`dy`.
+- Do NOT nest `baseline-shift` (no sub-of-sub) — use Tier B.
+- Unicode sub/superscript characters (`²`, `³`, `₂`, `ₑ`, etc.) are allowed as a shorthand for Tier A when coverage permits.
 
 #### Absolutely Forbidden Patterns (Blocking Error)
 
-These patterns in `<text>` / `<tspan>` without either `baseline-shift` or `<image>` conversion are **blocking errors**:
+**Anti-pattern: "fake superscript via separate text elements"** — this is the single most common violation. The AI places the base (`10`) as one `<text>` and the exponent (`2`) as a separate smaller `<text>` positioned higher, to visually approximate `10²`. This ALWAYS fails in PowerPoint:
+- The two text boxes drift apart on resize/reflow
+- Spacing is inconsistent across fonts and zoom levels
+- The exponent becomes an orphaned shape that's impossible to select/edit
+- Quality checker flags this as a proximity-based formula violation
+
+❌ **FORBIDDEN** — two separate `<text>` elements faking a superscript:
+
+```xml
+<!-- WRONG: "2" is a separate text box positioned to look like superscript -->
+<text x="200" y="300" font-size="24" fill="#333">10</text>
+<text x="230" y="285" font-size="16" fill="#333">2</text>
+```
+
+❌ **ALSO FORBIDDEN** — using `dy` on a tspan to fake vertical offset without `baseline-shift`:
+
+```xml
+<!-- WRONG: dy shift without baseline-shift semantics -->
+<text x="200" y="300" font-size="24" fill="#333">10<tspan dy="-8" font-size="16">2</tspan></text>
+```
+
+✅ **CORRECT — Tier A** (same `<text>`, using `baseline-shift`):
+
+```xml
+<text x="200" y="300" font-size="24" fill="#333">
+  10<tspan baseline-shift="super" font-size="70%">2</tspan>
+</text>
+```
+
+✅ **CORRECT — Tier B** (formula SVG image):
+
+```xml
+<image href="../images/formula_inline_901.svg" x="200" y="280" width="60" height="36"
+       preserveAspectRatio="xMidYMid meet"/>
+```
+
+The same ban applies to subscripts: do NOT place a subscript character in a separate `<text>` positioned lower.
+
+**Anti-pattern: "formula avoidance by text substitution"** — when the quality checker flags a formula violation, the AI sometimes "fixes" it by **deleting the formula and replacing it with plain Chinese/English text**. This is **strictly forbidden** — it destroys the scientific meaning of the slide content:
+
+❌ **FORBIDDEN workarounds**:
+
+| Original formula | Forbidden "fix" | Why it's wrong | Correct fix (Tier B) |
+|---|---|---|---|
+| `φ_burst` | → "破裂填充比" | Removes the variable name entirely | `latex_to_svg.py "\varphi_{\mathrm{burst}}"` → `<image>` |
+| `d_burst` | → "破裂深度" | Removes the variable name entirely | `latex_to_svg.py "d_{\mathrm{burst}}"` → `<image>` |
+| `x/y 周期` | → "x与y周期" | Removes the mathematical relationship | `latex_to_svg.py "x/y"` → `<image>` + 周期 |
+| `P = C₁ε^C₂ / (1+C₃ε^C₄)` | → "四参数 S 型曲线" | Removes the entire equation | `latex_to_svg.py "P = C_1 \varepsilon^{C_2} / (1 + C_3 \varepsilon^{C_4})"` → `<image>` |
+| `10^{-9}` | → "十亿分之一" | Replaces notation with prose | `latex_to_svg.py "10^{-9}"` → `<image>` |
+
+The ONLY acceptable response to a formula violation is to call `latex_to_svg.py` and embed the result as `<image>`. Never rewrite, simplify, translate, or remove formulas.
+
+**Other blocking error patterns** in `<text>` / `<tspan>` — fix by generating SVG via `latex_to_svg.py`:
 
 | Pattern | What's wrong | Fix |
 |---|---|---|
-| `a_1`, `T_e`, `x_n` | Raw underscore notation | Tier A `baseline-shift="sub"` or Tier B `<image>` |
-| `a^2`, `x^n`, `10^3` | Raw caret notation | Tier A `baseline-shift="super"` or Tier B `<image>` |
-| `a/b` between variables | Raw fraction | Tier B `<image>` with `\frac{}{}` |
-| `√x`, `√(...)` | Raw radical symbol | Tier B `<image>` with `\sqrt{}` |
-| `∑_{...}`, `∫_{...}` | Raw operator with limits | Tier B `<image>` |
-| `E = mc²` as flat text | Equation without proper rendering | Tier B `<image>` (or Tier A if only the `²` needs shifting) |
+| `a_1`, `T_e`, `x_n` | Raw underscore notation | `latex_to_svg.py "T_e"` → `<image>` |
+| `a^2`, `x^n`, `10^3` | Raw caret notation | `latex_to_svg.py "10^{3}"` → `<image>` |
+| `a/b` between variables | Raw fraction | `latex_to_svg.py "\frac{a}{b}"` → `<image>` |
+| `√x`, `√(...)` | Raw radical symbol | `latex_to_svg.py "\sqrt{x}"` → `<image>` |
+| `∑_{...}`, `∫_{...}` | Raw operator with limits | `latex_to_svg.py "\sum_{i=1}^{n}"` → `<image>` |
+| `E = mc²` as flat text | Equation without proper rendering | `latex_to_svg.py "E = mc^{2}"` → `<image>` |
 
 #### Boundary — What is NOT a Formula
 
 These are plain text and do NOT require conversion:
 
+- **Unicode sub/superscript characters in unit/label context**: `m²`, `s⁻¹`, `cm⁻³`, `H₂O`, `CO₂` — these are **allowed as Tier A shorthand** per §4.1. The glyphs render correctly in PowerPoint. (`baseline-shift` is preferred for full coverage, but Unicode shorthand is not an error.)
+- **Unit rate slashes**: `m/s`, `m²/s`, `km/h`, `steps/sec`, `steps/s`, `kg/m³`, `rad/s`, `eV/K` — these are units, not mathematical fractions.
+- **Abbreviation slashes**: `HS/VSS`, `E/B`, `AC/DC`, `TCP/IP` — alternative or paired abbreviations separated by `/`.
+- **Definition equals**: `OpenEdge = SPARTA DSMC 引擎`, `Result = 成功` — the `=` sign used as a natural-language equivalence or definition (left side is a long name, not a 1–3 char math variable).
 - **Standalone Greek letters as labels** (not in equations): "α相", "β版本", "Δ变化量"
 - **Simple percentages and multipliers**: "35%", "10×", "3.14"
 - **Chemical element symbols without subscripts**: "Fe", "Pb", "U"
@@ -284,7 +349,7 @@ These are plain text and do NOT require conversion:
 
 #### Quality Gate
 
-`svg_quality_checker.py` detects raw plain-text formula patterns (underscore notation, caret notation, Unicode sub/superscripts without `baseline-shift`, etc.) in `<text>` / `<tspan>` content and reports them as **errors** (not warnings). Properly marked `<tspan baseline-shift="sub/super">` elements are NOT flagged.
+`svg_quality_checker.py` detects raw plain-text formula patterns (underscore notation `a_1`, caret notation `x^2`, fraction slashes between math variables `ΔT/Δt`, short-variable equations `E=mc²`, radicals, and integral/summation with limits) in `<text>` / `<tspan>` content and reports them as **errors** (not warnings). The following are NOT flagged: Unicode sub/superscript characters (allowed as shorthand), abbreviation slashes (`HS/VSS`, `E/B`), unit rates (`m/s`, `steps/sec`), and long-name definitions. Properly marked `<tspan baseline-shift="sub/super">` elements are also NOT flagged.
 
 ### Inline Text Runs (Single Logical Line = Single `<text>`)
 

@@ -11,9 +11,24 @@ description: >
 
 > AI-driven multi-format SVG content generation system. Converts source documents into high-quality SVG pages through multi-role collaboration and exports to PPTX.
 
-## Local Windows Runtime Note
+## Python Command Detection (MANDATORY — run before any script)
 
-On this machine, run Python commands as `py -3.11` instead of `python3`, and set `$env:PYTHONUTF8='1'` in PowerShell before installing dependencies or running scripts. The Windows Store `python3.exe` alias is present and may fail before the real Python install is reached.
+All command examples below use `python3` as a placeholder. On Windows, `python3` often points to a Microsoft Store stub that silently fails (exit code 49). **Before the first script call in every session**, detect the working Python command:
+
+```bash
+# Try in order — use the first one that prints a version:
+python3 --version      # Linux / macOS / some Windows
+python --version       # Some Windows installs
+py -3 --version        # Windows Python Launcher (most reliable on Windows)
+```
+
+Store the result as `PYTHON` and use `${PYTHON}` for all subsequent commands. Example:
+```bash
+PYTHON="py -3"   # or python3, or python — whichever worked
+${PYTHON} ${SKILL_DIR}/scripts/preflight_check.py <project_path>
+```
+
+`preflight_check.py` also auto-detects the correct command and prints `PYTHON_CMD=<cmd>` — use that value for the rest of the session.
 
 **Core Pipeline**: `Source Document → Create Project → [Template] → Strategist → [Image_Generator] → Executor Live Preview → Quality Check → Post-processing → Export`
 
@@ -31,14 +46,20 @@ On this machine, run Python commands as `py -3.11` instead of `python3`, and set
 > 7. **SEQUENTIAL PAGE GENERATION ONLY** — In Executor Step 6, after the global design context is confirmed, SVG pages MUST be generated sequentially page by page in one continuous pass. Grouped page batches (for example, 5 pages at a time) are FORBIDDEN
 > 8. **SPEC_LOCK RE-READ PER PAGE** — Before generating each SVG page, Executor MUST `read_file <project_path>/spec_lock.md`. All colors / fonts / icons / images MUST come from this file — no values from memory or invented on the fly. Executor MUST also look up the current page's `page_rhythm` (`anchor` / `dense` / `breathing`), `page_layouts` (which template SVG to inherit, if any), and `page_charts` (which chart template to adapt, if any). Empty / absent entries are intentional Strategist signals — see executor-base.md §2.1. This rule exists to resist context-compression drift on long decks and to break the uniform "every page is a card grid" default
 > 9. **SVG MUST BE HAND-WRITTEN, NOT SCRIPT-GENERATED** — Every SVG page is written by the main agent directly, one page at a time (see rules 6 and 7). Writing or running a Python / Node / shell script that produces the SVG files in batch — looping over pages, templating from data, or emitting them via a generator — is FORBIDDEN, including under "save tokens", "quick draft", or "user is in a hurry" pretexts. The script-generation path was tried on a feature branch and abandoned: cross-page visual consistency depends on per-page authoring with full upstream context, which a generator script cannot reproduce
-> 10. **⛔ IRON RULE — NO PLAIN-TEXT FORMULAS** — Raw formula-like patterns (`a_1`, `x^2`, `a/b`, `√x`, bare `²`) in `<text>` / `<tspan>` without proper rendering are a **blocking error**. Two rendering tiers — full rules in [`shared-standards.md §4.1`](references/shared-standards.md):
->    - **Tier A — simple sub/super** (single-level, 1–3 chars like H₂O, Tₑ, 10⁻⁹, m²): use `<tspan baseline-shift="sub" font-size="70%">` or `baseline-shift="super"`. The converter maps this to native DrawingML `baseline` — editable in PowerPoint.
->    - **Tier B — complex formulas** (fractions, radicals, integrals, multi-level, full equations): call `latex_to_svg.py` → embed as `<image>`:
+> 10. **⛔ IRON RULE — NO PLAIN-TEXT FORMULAS / SVG-FIRST** — Raw formula-like patterns (`a_1`, `x^2`, `a/b`, `√x`, bare `²`) in `<text>` / `<tspan>` without proper rendering are a **blocking error**. **Placing the base and exponent/subscript in separate `<text>` elements to fake sub/superscripts is FORBIDDEN.** Full rules in [`shared-standards.md §4.1`](references/shared-standards.md).
+>    - **DEFAULT: Tier B — SVG image** — ALL mathematical formulas, including simple sub/superscripts like 10², H₂O, Tₑ, MUST be rendered as SVG images via `latex_to_svg.py` and embedded as `<image>`. This is the **only** approach the AI should use unless Tier A conditions are explicitly met.
 >      ```
->      python3 ${SKILL_DIR}/scripts/latex_to_svg.py "\\rho_L = \\frac{v_\\perp}{\\omega_c}" -o <project_path>/images/formula_inline_<NNN>.svg
+>      ${PYTHON} ${SKILL_DIR}/scripts/latex_to_svg.py "10^{2}" -o <project_path>/images/formula_inline_<NNN>.svg
 >      ```
->      Then embed as `<image href="../images/formula_inline_<NNN>.svg" .../>`. Counter `<NNN>` from 901.
->    - **Per-page mandatory pre-scan**: before writing each page, scan ALL planned text. Classify each formula-like token as Tier A or Tier B. Raw patterns without `baseline-shift` or `<image>` → blocking error. `svg_quality_checker.py` detects violations as **errors**.
+>      Then embed: `<image href="../images/formula_inline_<NNN>.svg" .../>`. Counter `<NNN>` from 901.
+>    - **EXCEPTION ONLY: Tier A — baseline-shift** — permitted ONLY when ALL of: (a) the expression is a single sub/superscript of 1–2 characters on a single base, (b) it appears **inline in a prose sentence** where an `<image>` element would break text flow (e.g. "扩散系数 D 的单位为 m²/s"), (c) no other formula on the same page uses Tier A (one Tier A per page maximum to keep things consistent). If in doubt, use Tier B.
+>    - **Per-page mandatory pre-scan**: before writing each page, scan ALL planned text for formula-like tokens. For each one, call `latex_to_svg.py` to generate the SVG **before** writing the page SVG. Raw patterns without `<image>` → blocking error. **Never split a formula across multiple `<text>` elements.** `svg_quality_checker.py` detects violations as **errors**.
+>    - **⛔ FORBIDDEN — formula avoidance by text substitution**: when the quality checker flags a formula violation, the ONLY acceptable fix is to **generate an SVG image** via `latex_to_svg.py`. Replacing the formula with plain-text descriptions (e.g. `φ_burst` → "破裂填充比"), removing mathematical notation (e.g. `x/y` → "x与y"), or substituting an equation with a vague label (e.g. `P = C₁ε^C₂ / (1+C₃ε^C₄)` → "四参数 S 型曲线") is **strictly forbidden**. These workarounds destroy the scientific meaning of the slide content.
+> 11. **⛔ IRON RULE — NEVER MODIFY OR DELETE USER SOURCE FILES** — User-provided original documents (PDF, DOCX, PPTX, XLSX, etc.) MUST **never** be deleted, moved, or modified. `import-sources` always **copies** original documents into `sources/` regardless of the `--move` flag. Only generated intermediate files (Step 1 Markdown output, `_files/` companion dirs) may be moved. If the original file disappears after the workflow, that is a critical bug.
+> 12. **⛔ IRON RULE — NEVER OVERWRITE EXISTING PROJECTS** — When creating a new project, if a project directory with the same name already exists, `project_manager.py init` automatically appends `_2`, `_3`, etc. Never reuse, overwrite, or continue work in an existing project directory when the user asks to create a **new** project. Each `init` call produces a fresh, independent project.
+> 13. **⛔ IRON RULE — NO IMAGE STRETCHING / DISTORTION** — When embedding source images (paper figures, screenshots, charts, diagrams, product photos) into SVG pages, the image MUST preserve its original aspect ratio. Use `preserveAspectRatio="xMidYMid meet"` (default). **`preserveAspectRatio="none"` is FORBIDDEN for all content-bearing images** — it stretches the image to fill the container, distorting charts, text, and details. If the image's native ratio does not match the allocated container, resize the container to match the image — never stretch the image to match the container. `svg_quality_checker.py` flags `preserveAspectRatio="none"` on non-background images as an **error**.
+> 14. **⛔ IRON RULE — QUALITY CHECKER ERRORS ARE BLOCKING** — When `svg_quality_checker.py` reports **errors** (not warnings), the Executor MUST fix every error before proceeding to Step 7. Errors are never "non-critical" — skipping formula violations, XML issues, or spec drift and proceeding to export defeats the quality gate. The ONLY acceptable response to an error is: fix the SVG, re-run the checker, confirm 0 errors. Proceeding with errors present constitutes execution failure.
+> 15. **⛔ IRON RULE — FORMULA ERRORS MUST BE FIXED BY SVG RENDERING, NEVER BY REMOVAL** — When the quality checker flags a plain-text formula violation, the executor MUST: (1) run `latex_to_svg.py` to render the formula as SVG, (2) embed via `<image>`. **Deleting the mathematical symbol and rewording the sentence** (e.g. `v_⊥²/(v²B) 较大` → "低速粒子", `v_∥ 足够大` → "平行速度分量足够大") is a **forbidden shortcut** — it destroys scientific meaning. If the LaTeX cannot compile, fix the source expression; never remove the formula.
 
 > [!IMPORTANT]
 > ## 🌐 Language & Communication Rule
@@ -130,14 +151,14 @@ When the user provides non-Markdown content, convert immediately:
 
 | User Provides | Command |
 |---------------|---------|
-| PDF file | `python3 ${SKILL_DIR}/scripts/source_to_md/mineru_to_md.py <file>` |
-| DOCX / Word / Office document | `python3 ${SKILL_DIR}/scripts/source_to_md/doc_to_md.py <file>` |
-| XLSX / XLSM / Excel workbook | `python3 ${SKILL_DIR}/scripts/source_to_md/excel_to_md.py <file>` |
+| PDF file | `${PYTHON} ${SKILL_DIR}/scripts/convert_pdf.py <file>` (stable wrapper with proxy/SSL bypass + retry; falls back to `source_to_md/mineru_to_md.py` internally) |
+| DOCX / Word / Office document | `${PYTHON} ${SKILL_DIR}/scripts/source_to_md/doc_to_md.py <file>` |
+| XLSX / XLSM / Excel workbook | `${PYTHON} ${SKILL_DIR}/scripts/source_to_md/excel_to_md.py <file>` |
 | CSV / TSV | Read directly as plain-text table source |
-| PPTX / PowerPoint deck | `python3 ${SKILL_DIR}/scripts/source_to_md/ppt_to_md.py <file>` |
-| EPUB / HTML / LaTeX / RST / other | `python3 ${SKILL_DIR}/scripts/source_to_md/doc_to_md.py <file>` |
-| Web link | `python3 ${SKILL_DIR}/scripts/source_to_md/web_to_md.py <URL>` |
-| WeChat / high-security site | `python3 ${SKILL_DIR}/scripts/source_to_md/web_to_md.py <URL>` (requires `curl_cffi`, included in `requirements.txt`) |
+| PPTX / PowerPoint deck | `${PYTHON} ${SKILL_DIR}/scripts/source_to_md/ppt_to_md.py <file>` |
+| EPUB / HTML / LaTeX / RST / other | `${PYTHON} ${SKILL_DIR}/scripts/source_to_md/doc_to_md.py <file>` |
+| Web link | `${PYTHON} ${SKILL_DIR}/scripts/source_to_md/web_to_md.py <URL>` |
+| WeChat / high-security site | `${PYTHON} ${SKILL_DIR}/scripts/source_to_md/web_to_md.py <URL>` (requires `curl_cffi`, included in `requirements.txt`) |
 | Markdown | Read directly |
 
 > **Office vector assets (EMF/WMF) from DOCX/PPTX sources**:
@@ -160,13 +181,13 @@ When the user provides non-Markdown content, convert immediately:
 > When source material was parsed by MinerU (or any converter that preserves LaTeX notation), the resulting Markdown may contain `$...$` and `$$...$$` formulas. After conversion, run:
 >
 > ```bash
-> python3 ${SKILL_DIR}/scripts/extract_formulas.py <markdown_file> -o <project_path>/images/formula_manifest.json
+> ${PYTHON} ${SKILL_DIR}/scripts/extract_formulas.py <markdown_file> -o <project_path>/images/formula_manifest.json
 > ```
 >
 > This produces `formula_manifest.json` listing every extracted formula. In Step 4, the Strategist reviews the manifest and sets `"render": true` for formulas that should appear as SVG graphics in the presentation. In Step 5, the rendering runs:
 >
 > ```bash
-> python3 ${SKILL_DIR}/scripts/latex_to_svg.py --manifest <project_path>/images/formula_manifest.json
+> ${PYTHON} ${SKILL_DIR}/scripts/latex_to_svg.py --manifest <project_path>/images/formula_manifest.json
 > ```
 >
 > Generated formula SVGs land in `images/` as `formula_*.svg` and are referenced like any other image asset: `<image href="../images/formula_001_xxx.svg" .../>`.
@@ -186,7 +207,7 @@ When the user provides non-Markdown content, convert immediately:
 🚧 **GATE**: Step 1 complete; source content is ready (Markdown file, user-provided text, or requirements described in conversation are all valid).
 
 ```bash
-python3 ${SKILL_DIR}/scripts/project_manager.py init <project_name> --format <format>
+${PYTHON} ${SKILL_DIR}/scripts/project_manager.py init <project_name> --format <format>
 ```
 
 Format options: `ppt169` (default), `ppt43`, `xhs`, `story`, etc. For the full format list, see `references/canvas-formats.md`.
@@ -195,14 +216,16 @@ Import source content (choose based on the situation):
 
 | Situation | Action |
 |-----------|--------|
-| Has source files (PDF/MD/etc.) | `python3 ${SKILL_DIR}/scripts/project_manager.py import-sources <project_path> <source_files...> --move` |
+| Has source files (PDF/MD/etc.) | `${PYTHON} ${SKILL_DIR}/scripts/project_manager.py import-sources <project_path> <source_files...> --move` |
 | User provided text directly in conversation | No import needed — content is already in conversation context; subsequent steps can reference it directly |
 
-> ⚠️ **MUST use `--move`** (not copy): all source files — Step 1's generated Markdown, original PDFs / MDs / images — go into `sources/` via `import-sources --move`. After execution they no longer exist at the original location. Intermediate artifacts (e.g., `_files/`) are handled automatically.
+> ⚠️ **Source document protection**: `import-sources` **always copies** original documents (PDF, DOCX, PPTX, XLSX, etc.) — even with `--move`. Only generated intermediate files (Step 1's Markdown output, `_files/` dirs) are moved. The user's original file is **never deleted or modified**.
+>
+> ⚠️ **Project name collision**: if a project directory with the same name already exists, `init` automatically appends an incrementing suffix (`_2`, `_3`, ...) to create a **new** project. It **never overwrites or reuses** an existing project directory.
 
 **Live Preview Early Startup (Mandatory)**: immediately after the project directory exists, launch the browser editor and keep it running through the whole workflow:
 ```bash
-python3 ${SKILL_DIR}/scripts/start_live_preview.py <project_path>
+${PYTHON} ${SKILL_DIR}/scripts/start_live_preview.py <project_path>
 ```
 - Open it right after Step 2 succeeds, not later. The wrapper starts `svg_editor/server.py` in the background, waits for readiness, prints `LIVE_PREVIEW_URL=...`, opens the browser locally, and exits so the workflow can continue.
 - Default URL is `http://127.0.0.1:5050`; if `5050` is unavailable, use `--port <other>` and report the **actual** URL that was printed.
@@ -335,7 +358,7 @@ This line is required output every run — the user must always see the mode cho
 
 If the user provided images, run analysis **before outputting the design spec**:
 ```bash
-python3 ${SKILL_DIR}/scripts/analyze_images.py <project_path>/images
+${PYTHON} ${SKILL_DIR}/scripts/analyze_images.py <project_path>/images
 ```
 
 > ⚠️ **Image scale iron rule**: when the deck uses source-document images (paper figures, screenshots, source charts, dense diagrams, evidence photos, product photos), Strategist MUST `read_file references/image-layout-spec.md` before locking §VIII and the outline. Plan from native dimensions and readable complete-display size, not from a text-first placeholder box. Large, information-bearing source images may own the page or dominant zone; they must not be shrunk into a small supporting tile just to preserve extra bullets. If image + text cannot both remain readable, reduce text density or split the material across more pages.
@@ -374,8 +397,8 @@ Then **lazy-load the path-specific reference** for each row that actually needs 
 
 | Acquire Via | Load reference (only if any such row exists) | Run |
 |---|---|---|
-| `ai` | `references/image-generator.md` | `python3 ${SKILL_DIR}/scripts/image_gen.py --manifest <project_path>/images/image_prompts.json` |
-| `web` | `references/image-searcher.md` | `python3 ${SKILL_DIR}/scripts/image_search.py ...` |
+| `ai` | `references/image-generator.md` | `${PYTHON} ${SKILL_DIR}/scripts/image_gen.py --manifest <project_path>/images/image_prompts.json` |
+| `web` | `references/image-searcher.md` | `${PYTHON} ${SKILL_DIR}/scripts/image_search.py ...` |
 | `user` / `placeholder` | (skip) | (skip) |
 
 A deck with only `ai` rows never loads `image-searcher.md`; a deck with only `web` rows never loads `image-generator.md`. A mixed deck loads both, processes each row through its own path, and writes both `image_prompts.json` and `image_sources.json`.
@@ -387,7 +410,7 @@ Workflow:
 1. Extract all rows with `Status: Pending` and `Acquire Via ∈ {ai, web}` from the design spec
 2. Generate prompts (ai rows) and/or run search (web rows) per [image-base.md](references/image-base.md) §2 dispatch table
 3. Verify every row reaches a terminal status: `Generated` (ai success), `Sourced` (web success), or `Needs-Manual`
-4. **Formula rendering (conditional)**: If `formula_manifest.json` exists in `images/` and contains entries with `"render": true`, run `python3 ${SKILL_DIR}/scripts/latex_to_svg.py --manifest <project_path>/images/formula_manifest.json` to generate formula SVGs
+4. **Formula rendering (conditional)**: If `formula_manifest.json` exists in `images/` and contains entries with `"render": true`, run `${PYTHON} ${SKILL_DIR}/scripts/latex_to_svg.py --manifest <project_path>/images/formula_manifest.json` to generate formula SVGs
 
 **✅ Checkpoint — Confirm acquisition attempted for every row**:
 ```markdown
@@ -431,7 +454,7 @@ Read references/executor-consultant-top.md # Top consulting style (MBB level)
 
 **Live Preview Continuation (Mandatory)**: ensure the browser editor from Step 2 is still running before the first SVG, and keep it running continuously through Executor + Step 7 export:
 ```bash
-python3 ${SKILL_DIR}/scripts/start_live_preview.py <project_path>
+${PYTHON} ${SKILL_DIR}/scripts/start_live_preview.py <project_path>
 ```
 - If Step 2 already opened the preview, this command should simply reuse it; otherwise start it now. The wrapper prints `LIVE_PREVIEW_URL=...` and the editor should be at `http://127.0.0.1:5050` unless another port had to be chosen.
 - If another preview is already running for a different project, switch the preview to the current project first; always report the **actual** URL the server ended up using instead of assuming `5050`.
@@ -451,7 +474,7 @@ python3 ${SKILL_DIR}/scripts/start_live_preview.py <project_path>
 
 **Quality Check Gate (Mandatory)** — after all SVGs, BEFORE annotation handling and speaker notes:
 ```bash
-python3 ${SKILL_DIR}/scripts/svg_quality_checker.py <project_path>
+${PYTHON} ${SKILL_DIR}/scripts/svg_quality_checker.py <project_path>
 ```
 - Any `error` (banned SVG features, viewBox mismatch, spec_lock drift, etc.) MUST be fixed before proceeding — return to Visual Construction, regenerate that page, re-run check.
 - `warning` entries (low-res image, non-PPT-safe font tail, etc.): fix when straightforward, otherwise acknowledge and release.
@@ -489,17 +512,17 @@ Canonical three-command pipeline (mirrors `references/shared-standards.md` §5):
 
 **Step 7.1** — Split speaker notes:
 ```bash
-python3 ${SKILL_DIR}/scripts/total_md_split.py <project_path>
+${PYTHON} ${SKILL_DIR}/scripts/total_md_split.py <project_path>
 ```
 
 **Step 7.2** — SVG post-processing (icon embedding / image crop & embed / text flattening / rounded rect to path):
 ```bash
-python3 ${SKILL_DIR}/scripts/finalize_svg.py <project_path>
+${PYTHON} ${SKILL_DIR}/scripts/finalize_svg.py <project_path>
 ```
 
 **Step 7.3** — Export PPTX (embeds speaker notes by default):
 ```bash
-python3 ${SKILL_DIR}/scripts/svg_to_pptx.py <project_path>
+${PYTHON} ${SKILL_DIR}/scripts/svg_to_pptx.py <project_path>
 # Output (default-flow mode):
 #   exports/<project_name>_<timestamp>.pptx           ← native pptx (canonical output, reads svg_output/)
 #   backup/<timestamp>/svg_output/                    ← Executor SVG source backup (always written)
@@ -581,5 +604,5 @@ Before switching roles, **MUST first read** the corresponding reference file. Ou
 
 ## Notes
 
-- Local preview: `python3 -m http.server -d <project_path>/svg_final 8000`
+- Local preview: `${PYTHON} -m http.server -d <project_path>/svg_final 8000`
 - **Troubleshooting**: on generation issues (layout overflow, export errors, blank images, etc.), check `docs/faq.md` for known solutions

@@ -372,6 +372,17 @@ def stabilize_assets(
                     entry_to_update["original_filename"] = entry_to_update.get("original_filename", img_path.name)
                     entry_to_update["filename"] = alias
                     manifest_by_filename[alias] = entry_to_update
+        elif not rename and img_path.name != alias:
+            # Create a copy with the alias name so SVG <image href> references
+            # using the short alias resolve to an actual file on disk.
+            alias_target = images_dir / alias
+            if not alias_target.exists():
+                try:
+                    # Prefer hard link (no extra disk space, instant)
+                    os.link(img_path, alias_target)
+                except OSError:
+                    # Fallback to copy if hard links are unsupported
+                    shutil.copy2(img_path, alias_target)
 
     for idx, formula_path in enumerate(sorted(formula_paths), start=1):
         entry = formula_by_name.get(formula_path.name)

@@ -10,6 +10,8 @@ Usage:
     python3 scripts/svg_quality_checker.py --all examples
 """
 
+import io
+import os
 import sys
 import re
 import json
@@ -18,6 +20,25 @@ from pathlib import Path
 from typing import List, Dict, Tuple
 from collections import defaultdict
 from xml.etree import ElementTree as ET
+
+# --- Windows GBK crash prevention ---
+# On Windows the default console encoding is often GBK (cp936) which cannot
+# encode many Unicode characters found in SVG content (subscripts, ©, etc.).
+# Force UTF-8 on stdout/stderr so the checker never crashes mid-report.
+if sys.platform == "win32":
+    for _stream_name in ("stdout", "stderr"):
+        _stream = getattr(sys, _stream_name)
+        if hasattr(_stream, "reconfigure"):
+            try:
+                _stream.reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
+        elif hasattr(_stream, "buffer"):
+            setattr(sys, _stream_name, io.TextIOWrapper(
+                _stream.buffer, encoding="utf-8", errors="replace",
+            ))
+    # Also set the env var so child processes inherit the preference.
+    os.environ.setdefault("PYTHONIOENCODING", "utf-8")
 
 try:
     from project_utils import CANVAS_FORMATS
@@ -287,6 +308,12 @@ class SVGQualityChecker:
                 if not self.template_mode:
                     self._check_plain_text_formulas(content, result)
 
+                # 11. Check fake-superscript anti-pattern: adjacent <text>
+                #     elements with mismatched font-size positioned to fake
+                #     sub/superscripts.  Templates are excluded.
+                if not self.template_mode:
+                    self._check_fake_sub_superscript(content, result)
+
             # Determine pass/fail
             result['passed'] = len(result['errors']) == 0
 
@@ -311,6 +338,14 @@ class SVGQualityChecker:
         self.results.append(result)
         return result
 
+    # Pattern to detect illegal double-hyphen inside XML comments.
+    # XML spec: within <!-- ... -->, the string "--" is forbidden.
+    # AI frequently writes things like <!-- 10^-11 -- 10^-9 s -->.
+    _COMMENT_DOUBLE_HYPHEN_RE: re.Pattern = re.compile(
+        r'<!--(.*?)-->',
+        re.DOTALL,
+    )
+
     def _check_xml_well_formed(self, content: str, result: Dict) -> bool:
         """Check that the SVG content parses as well-formed XML.
 
@@ -323,6 +358,17 @@ class SVGQualityChecker:
 
         Returns True when the document is well-formed; False otherwise.
         """
+        # Pre-parse: detect illegal "--" inside XML comments (common AI mistake)
+        for m in self._COMMENT_DOUBLE_HYPHEN_RE.finditer(content):
+            body = m.group(1)
+            if '--' in body:
+                line_no = content[:m.start()].count('\n') + 1
+                result['errors'].append(
+                    f"Illegal '--' inside XML comment at line ~{line_no}: "
+                    f"XML forbids double-hyphen in <!-- ... -->. "
+                    f"Remove or rephrase the comment content."
+                )
+
         try:
             ET.fromstring(content)
             return True
@@ -582,6 +628,26 @@ class SVGQualityChecker:
                     f"Image file not found: {href} (resolved to {img_path})")
                 continue
 
+            # Iron Rule §13: preserveAspectRatio="none" stretches images.
+            # Allowed only for full-bleed background images (covering full
+            # canvas at position 0,0).  Content images must never be
+            # stretched.
+            par_match = re.search(
+                r'\bpreserveAspectRatio="([^"]*)"', attrs)
+            if par_match and par_match.group(1).strip().lower() == 'none':
+                x_match = re.search(r'\bx="([^"]*)"', attrs)
+                y_match = re.search(r'\by="([^"]*)"', attrs)
+                x_val = float(x_match.group(1)) if x_match else -1
+                y_val = float(y_match.group(1)) if y_match else -1
+                is_full_bleed_bg = (x_val == 0 and y_val == 0)
+                if not is_full_bleed_bg:
+                    result['errors'].append(
+                        f"Image {href} uses preserveAspectRatio=\"none\" "
+                        f"(stretches/distorts the image). Use "
+                        f"\"xMidYMid meet\" to preserve aspect ratio, "
+                        f"or resize the container to match the image."
+                    )
+
             # Check resolution vs display size
             w_match = re.search(r'\bwidth="([^"]+)"', attrs)
             h_match = re.search(r'\bheight="([^"]+)"', attrs)
@@ -720,7 +786,13 @@ class SVGQualityChecker:
         font_drifts = set()
         for m in re.finditer(r'font-family\s*=\s*["\']([^"\']+)["\']', content):
             val = m.group(1).strip()
-            if allowed_fonts and val not in allowed_fonts:
+            if not allowed_fonts:
+                continue
+            # Font stacks like "'Microsoft YaHei', 'PingFang SC', sans-serif"
+            # match if ANY declared font name appears as a substring.
+            # This handles the common case where spec_lock stores a single
+            # family name but the SVG uses a full CSS fallback stack.
+            if val not in allowed_fonts and not any(f in val for f in allowed_fonts):
                 font_drifts.add(val)
 
         size_drifts = set()
@@ -844,6 +916,10 @@ class SVGQualityChecker:
     # Each tuple: (compiled regex, human-readable description).
     # Patterns are intentionally conservative — they target unambiguous
     # formula syntax, not every possible Unicode math character.
+    #
+    # NOTE: Unicode sub/superscript characters (², ³, ₂, ₑ, ⁻¹, etc.) are
+    # explicitly ALLOWED as Tier A shorthand per §4.1 — do NOT add patterns
+    # that flag them.  They render correctly via their own glyphs in PPT.
     _FORMULA_PATTERNS: List[Tuple[re.Pattern, str]] = [
         # Subscript notation:  a_1  T_e  ρ_L  x_{n+1}  H_2O
         (re.compile(r'[A-Za-z\u0370-\u03FF\u0400-\u04FF]_[\{\[A-Za-z0-9⊥∥]'),
@@ -851,13 +927,6 @@ class SVGQualityChecker:
         # Superscript notation:  a^2  x^n  e^{-x}  cm^{-3}
         (re.compile(r'[A-Za-z0-9\u0370-\u03FF\)]\^[\{\[A-Za-z0-9\-+]'),
          "superscript notation (e.g. x^2, e^{-x}, cm^{-3})"),
-        # Unicode superscript digits (except standalone ² ³ in prose like "第2次"):
-        # require a preceding letter  →  m², s⁻¹, cm⁻³
-        (re.compile(r'[A-Za-z\u0370-\u03FF][²³⁴⁵⁶⁷⁸⁹⁰⁻⁺]'),
-         "Unicode superscript after letter (e.g. m², s⁻¹)"),
-        # Unicode subscript digits after a letter: H₂O, CO₂
-        (re.compile(r'[A-Za-z\u0370-\u03FF][₀₁₂₃₄₅₆₇₈₉ₙᵢ]'),
-         "Unicode subscript after letter (e.g. H₂O, CO₂)"),
         # Summation / product / integral with limits:  ∑_{  ∏_{  ∫_  ∫_0^∞
         (re.compile(r'[∑∏∫][_^]'),
          "summation/product/integral with limits (e.g. ∑_{i=1}^{n})"),
@@ -865,20 +934,42 @@ class SVGQualityChecker:
         (re.compile(r'[√∛∜]'),
          "radical symbol (√, ∛, ∜)"),
         # Fraction between variable-like tokens: v_⊥/ω_c, ΔT/Δt, dN/dt
-        # but NOT "and/or", filesystem paths, or dates
+        # but NOT abbreviation slashes (HS/VSS), unit rates (m/s, steps/sec),
+        # or English-word slashes.  Post-match filter in _is_safe_slash().
         (re.compile(
             r'(?<![/\w])(?:[A-Z][a-z]?|[a-z]|[Δδ∂])[A-Za-z0-9_]*'
             r'/'
             r'(?:[A-Z][a-z]?|[a-z]|[Δδ∂])[A-Za-z0-9_]*(?![/\w])'
         ), "fraction between variables (e.g. a/b, ΔT/Δt, dN/dt)"),
-        # Equals-sign equations with variables on both sides:
-        # E = mc², F = ma, PV = nRT  (but not simple "x = 5" or attribute assignments)
-        (re.compile(
-            r'(?<!["\'])(?:[A-Za-z\u0370-\u03FF][A-Za-z0-9_]*)\s*=\s*'
-            r'(?:[A-Za-z\u0370-\u03FF][A-Za-z0-9_]*[\s*/+\-·×]'
-            r'[A-Za-z\u0370-\u03FF0-9_²³⁻⁺]+)'
-        ), "equation with variables (e.g. E=mc², PV=nRT)"),
+        # NOTE: plain-text equations like "PV = nRT", "F = ma", "E = mc²"
+        # are NOT flagged.  They render correctly as text in PPT because
+        # they contain no structural math (subscripts, fractions, radicals).
+        # The dangerous sub-patterns (caret ^, underscore _, √, ∫) are
+        # caught by the patterns above.  Removing the equation-equals
+        # pattern avoids false positives on definitions like
+        # "OpenEdge = SPARTA DSMC 引擎".
     ]
+
+    # Slash expressions that are NOT mathematical fractions.
+    # Used by _is_safe_slash() to suppress false positives from the
+    # fraction-detection pattern.
+    _SAFE_SLASH_RE: re.Pattern = re.compile(
+        r'^(?:'
+        # Both sides all-uppercase (abbreviations): HS/VSS, E/B, AC/DC
+        r'[A-Z]+/[A-Z]+'
+        # Left side is 3+ alphabetic chars (English word): steps/sec, steps/s
+        r'|[a-zA-Z]{3,}/[a-zA-Z]+'
+        # Unit rates with single-letter unit on either side: K/min, J/mol
+        r'|[A-Z]/[a-z]{2,}'
+        # Chemical element slash (1 uppercase + optional lowercase): Be/W, Fe/Cr
+        r'|[A-Z][a-z]?/[A-Z][a-z]?'
+        r')$'
+    )
+    _SAFE_UNIT_FRACTIONS: frozenset = frozenset({
+        'm/s', 'km/h', 'kg/m', 'J/K', 'W/m', 'V/m', 'A/m', 'N/m',
+        'C/m', 'g/L', 'g/l', 'mg/L', 'rad/s', 'eV/K',
+        'K/min', 'J/mol', 'g/mol', 'L/min', 'mL/min',
+    })
 
     def _check_plain_text_formulas(self, content: str, result: Dict):
         """Detect mathematical notation written as <text>/<tspan> content.
@@ -945,6 +1036,10 @@ class SVGQualityChecker:
         for pattern, description in self._FORMULA_PATTERNS:
             match = pattern.search(fragment)
             if match:
+                # Post-match false-positive guard for context-sensitive
+                # patterns (fractions, equations).
+                if self._is_formula_false_positive(match, description):
+                    continue
                 snippet = fragment[:80] + ('…' if len(fragment) > 80 else '')
                 violations.append(
                     f"Plain-text formula detected ({description}): "
@@ -952,6 +1047,128 @@ class SVGQualityChecker:
                     f"latex_to_svg.py (Tier B) per Iron Rule §4.1"
                 )
                 break  # one violation per fragment is enough
+
+    def _is_formula_false_positive(self, match: re.Match, description: str) -> bool:
+        """Return True if the regex match is a known false positive.
+
+        Suppresses common non-formula patterns that the broad regexes
+        accidentally catch:  abbreviation slashes (HS/VSS, E/B),
+        unit rates (m/s, steps/sec), and long-name definitions.
+        """
+        matched = match.group()
+        if 'fraction' in description:
+            # Known safe unit fractions
+            if matched in self._SAFE_UNIT_FRACTIONS:
+                return True
+            # Structural safe-slash patterns (abbreviations, English words)
+            if self._SAFE_SLASH_RE.match(matched):
+                return True
+        return False
+
+    # ------------------------------------------------------------------
+    # Fake sub/superscript detection (Iron Rule §4.1 anti-pattern)
+    # ------------------------------------------------------------------
+
+    def _check_fake_sub_superscript(self, content: str, result: Dict):
+        """Detect adjacent <text> elements faking sub/superscripts.
+
+        Anti-pattern: placing "10" as one <text> and "2" as a separate
+        smaller <text> positioned higher to visually approximate 10².
+        This always causes spacing drift in PowerPoint.
+        """
+        try:
+            root = ET.fromstring(content)
+        except ET.ParseError:
+            return
+
+        # Collect all <text> elements with their position, font-size, and content.
+        text_elems: List[Dict] = []
+        for elem in root.iter():
+            local = elem.tag.split('}')[-1] if '}' in str(elem.tag) else str(elem.tag)
+            if local != 'text':
+                continue
+
+            x_str = elem.get('x')
+            y_str = elem.get('y')
+            if x_str is None or y_str is None:
+                continue
+
+            try:
+                x = float(x_str.split(',')[0].split()[0])
+                y = float(y_str.split(',')[0].split()[0])
+            except (ValueError, IndexError):
+                continue
+
+            # Collect all text content
+            text_content = ''.join(elem.itertext()).strip()
+            if not text_content:
+                continue
+
+            # Get font-size (from attribute or style)
+            fs_raw = elem.get('font-size') or ''
+            if not fs_raw:
+                style = elem.get('style', '')
+                for part in style.split(';'):
+                    if 'font-size' in part and ':' in part:
+                        fs_raw = part.split(':')[1].strip()
+                        break
+            try:
+                fs = float(fs_raw.replace('px', '').replace('pt', '').strip())
+            except (ValueError, AttributeError):
+                fs = 0.0
+
+            text_elems.append({
+                'x': x, 'y': y, 'fs': fs,
+                'text': text_content, 'len': len(text_content),
+            })
+
+        if len(text_elems) < 2:
+            return
+
+        # Check every pair: one short text (1-3 chars) near a longer text,
+        # with smaller font-size and vertical offset → likely fake sub/super.
+        for i, a in enumerate(text_elems):
+            for b in text_elems[i + 1:]:
+                # Identify which is the "short" (potential exponent) and which
+                # is the "base".
+                if a['len'] <= 3 and b['len'] > a['len']:
+                    short, base = a, b
+                elif b['len'] <= 3 and a['len'] > b['len']:
+                    short, base = b, a
+                else:
+                    continue
+
+                # Skip if either has zero font-size (unknown)
+                if short['fs'] <= 0 or base['fs'] <= 0:
+                    continue
+
+                # The short element must be noticeably smaller
+                if short['fs'] >= base['fs'] * 0.9:
+                    continue
+
+                # Must be horizontally close — the short text should be near
+                # the right edge of the base.  Approximate base width.
+                approx_base_width = base['len'] * base['fs'] * 0.6
+                dx = short['x'] - (base['x'] + approx_base_width)
+                # Allow small gap or slight overlap
+                if dx < -base['fs'] * 0.5 or dx > base['fs'] * 1.5:
+                    continue
+
+                # Must be vertically offset (superscript = higher = smaller y;
+                # subscript = lower = larger y).
+                dy = abs(short['y'] - base['y'])
+                if dy < base['fs'] * 0.15 or dy > base['fs'] * 1.0:
+                    continue
+
+                # This looks like a fake sub/superscript
+                result['errors'].append(
+                    f"Fake sub/superscript detected: \"{base['text']}\" "
+                    f"(font-size {base['fs']}) + \"{short['text']}\" "
+                    f"(font-size {short['fs']}) are separate <text> elements "
+                    f"positioned to fake a formula. Use <tspan baseline-shift="
+                    f"\"super/sub\" font-size=\"70%\"> inside a single <text> "
+                    f"(Tier A) or latex_to_svg.py (Tier B) per Iron Rule §4.1"
+                )
 
     def _categorize_issue(self, error_msg: str) -> str:
         """Categorize issue type"""
@@ -963,6 +1180,10 @@ class SVGQualityChecker:
             return 'foreignObject'
         elif 'Plain-text formula' in error_msg:
             return 'Plain-text formula (Iron Rule §4.1)'
+        elif 'Fake sub/superscript' in error_msg:
+            return 'Fake sub/superscript (Iron Rule §4.1)'
+        elif 'Banned font' in error_msg:
+            return 'Banned font'
         elif 'font' in error_msg.lower():
             return 'Font issues'
         else:

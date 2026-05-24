@@ -71,6 +71,8 @@ class FormulaEntry:
     display: bool = True
     render: bool = False
     context: str = ""
+    source_file: str = ""
+    line_number: int | None = None
     source_page: int | None = None
     status: str = "pending"
     svg_path: str = ""
@@ -88,6 +90,10 @@ class FormulaEntry:
             "context": self.context,
             "status": self.status,
         }
+        if self.source_file:
+            d["source_file"] = self.source_file
+        if self.line_number is not None:
+            d["line_number"] = self.line_number
         if self.source_page is not None:
             d["source_page"] = self.source_page
         if self.svg_path:
@@ -106,7 +112,8 @@ class FormulaEntry:
     def from_dict(cls, d: dict) -> "FormulaEntry":
         known_keys = {
             "id", "latex", "display", "render", "context",
-            "source_page", "status", "svg_path", "svg_width",
+            "source_file", "line_number", "source_page",
+            "status", "svg_path", "svg_width",
             "svg_height", "error",
         }
         extra = {k: v for k, v in d.items() if k not in known_keys}
@@ -116,6 +123,8 @@ class FormulaEntry:
             display=d.get("display", True),
             render=d.get("render", False),
             context=d.get("context", ""),
+            source_file=d.get("source_file", ""),
+            line_number=d.get("line_number"),
             source_page=d.get("source_page"),
             status=d.get("status", "pending"),
             svg_path=d.get("svg_path", ""),
@@ -155,6 +164,20 @@ def _find_dvisvgm() -> str:
 # ============================================================
 # Core conversion
 # ============================================================
+
+# TeX internal commands that MinerU sometimes leaves in extracted formulas.
+# These are low-level TeX primitives that cause compilation or dvisvgm
+# failures.  We strip them silently since they carry no visual meaning.
+_TEX_INTERNAL_STRIP_RE = re.compile(
+    r'\\(?:aftergroup|egroup|bgroup|begingroup|endgroup'
+    r'|expandafter|noexpand|relax|protect)\b\s*'
+)
+
+
+def _sanitize_formula(formula: str) -> str:
+    """Remove TeX internal commands that break compilation."""
+    return _TEX_INTERNAL_STRIP_RE.sub('', formula)
+
 
 def _build_tex_source(
     formula: str,
@@ -222,6 +245,7 @@ def compile_formula_to_svg(
     output_path = output_path.resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
+    formula = _sanitize_formula(formula)
     tex_source = _build_tex_source(formula, display=display, border_pt=border_pt)
 
     with tempfile.TemporaryDirectory(prefix="pptmaster_latex_") as tmp:

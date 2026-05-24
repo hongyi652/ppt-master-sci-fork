@@ -154,8 +154,22 @@ class ProjectManager:
         project_dir_name = f"{project_name}_{normalized_format}_{date_str}"
         project_path = base_path / project_dir_name
 
+        # Auto-increment suffix to avoid overwriting existing projects.
+        # Never reuse or overwrite an existing project directory.
         if project_path.exists():
-            raise FileExistsError(f"Project directory already exists: {project_path}")
+            counter = 2
+            while True:
+                candidate = base_path / f"{project_name}_{normalized_format}_{date_str}_{counter}"
+                if not candidate.exists():
+                    project_path = candidate
+                    project_dir_name = candidate.name
+                    print(
+                        f"note: {base_path / f'{project_name}_{normalized_format}_{date_str}'} "
+                        f"already exists; creating {project_dir_name} instead.",
+                        file=sys.stderr,
+                    )
+                    break
+                counter += 1
 
         for rel_path in (
             "svg_output",
@@ -272,10 +286,14 @@ class ProjectManager:
         pdf_path: Path,
         markdown_path: Path,
     ) -> None:
+        # Use convert_pdf.py (stable wrapper) instead of raw mineru_to_md.py.
+        # The wrapper handles proxy/SSL bypass (NO_PROXY for mineru.net),
+        # automatic retry on transient network errors, and writes a
+        # conversion report — all of which raw mineru_to_md.py lacks.
         self._run_tool(
             [
                 sys.executable,
-                str(TOOLS_DIR / "source_to_md" / "mineru_to_md.py"),
+                str(TOOLS_DIR / "convert_pdf.py"),
                 str(pdf_path),
                 "-o",
                 str(markdown_path),
@@ -524,6 +542,53 @@ class ProjectManager:
         if asset_dir.is_dir():
             self._propagate_image_assets(asset_dir, project_dir)
 
+    def _ensure_all_companion_images_propagated(
+        self,
+        sources_dir: Path,
+        project_dir: Path,
+    ) -> None:
+        """Safety net: scan sources/ for *_files/ dirs with images not yet in images/.
+
+        The primary propagation runs inline per source type, but edge cases
+        (MinerU API timing, manual pre-conversion, naming mismatches) can
+        leave companion images stranded in sources/.  This post-import sweep
+        catches them.
+        """
+        images_dir = project_dir / "images"
+        if not sources_dir.is_dir():
+            return
+        existing_images: set[str] = set()
+        if images_dir.is_dir():
+            existing_images = {
+                p.name for p in images_dir.iterdir()
+                if p.is_file() and p.suffix.lower() in IMAGE_ASSET_SUFFIXES
+            }
+
+        for candidate in sorted(sources_dir.iterdir()):
+            if not candidate.is_dir() or not candidate.name.endswith("_files"):
+                continue
+            companion_images = [
+                p for p in sorted(candidate.iterdir())
+                if p.is_file() and p.suffix.lower() in IMAGE_ASSET_SUFFIXES
+            ]
+            if not companion_images:
+                continue
+            # Check if any image from this companion dir is missing from images/
+            namespace = self._namespace_from_asset_dir(candidate)
+            missing = [
+                p for p in companion_images
+                if f"{namespace}__{p.name}" not in existing_images
+                and p.name not in existing_images
+            ]
+            if missing:
+                self._propagate_image_assets(candidate, project_dir)
+                # Update existing_images set for subsequent dirs
+                if images_dir.is_dir():
+                    existing_images = {
+                        p.name for p in images_dir.iterdir()
+                        if p.is_file() and p.suffix.lower() in IMAGE_ASSET_SUFFIXES
+                    }
+
     def _import_markdown_with_assets(
         self,
         source_path: Path,
@@ -619,8 +684,28 @@ class ProjectManager:
                 summary["skipped"].append(f"{item}: directories are not supported")
                 continue
 
-            if copy:
+            suffix = source_path.suffix.lower()
+
+            # ⛔ IRON RULE: user-provided original documents (PDF, DOCX,
+            # PPTX, XLSX, etc.) are ALWAYS copied, NEVER moved — regardless
+            # of --move or repo-internal auto-move.  Only intermediate /
+            # generated files (Markdown from Step 1 conversion, companion
+            # asset dirs) may be moved.
+            _ORIGINAL_DOC_SUFFIXES = (
+                PDF_SUFFIXES | PRESENTATION_SUFFIXES | EXCEL_SUFFIXES
+                | LEGACY_EXCEL_SUFFIXES | DOC_SUFFIXES
+                | {'.txt', '.csv', '.tsv'}
+            )
+            is_original_doc = suffix in _ORIGINAL_DOC_SUFFIXES
+
+            if copy or is_original_doc:
                 effective_move = False
+                if is_original_doc and move:
+                    print(
+                        f"note: {source_path.name} is an original document; "
+                        f"copied (not moved) to protect the source file.",
+                        file=sys.stderr,
+                    )
             elif move:
                 effective_move = True
             elif is_within_path(source_path, REPO_ROOT):
@@ -632,7 +717,6 @@ class ProjectManager:
                 )
             else:
                 effective_move = False
-            suffix = source_path.suffix.lower()
 
             if suffix in {".md", ".markdown"}:
                 duplicate_markdown = self._find_equivalent_markdown(source_path, sources_dir)
@@ -775,6 +859,12 @@ class ProjectManager:
             )
         elif formula_summary.get("removed"):
             summary["notes"].append("Formula sync: no LaTeX formulas detected, cleared stale formula artifacts.")
+
+        # Safety net: ensure every *_files/ companion dir under sources/ has
+        # its images propagated to images/.  The primary propagation happens
+        # inline during each source type's import path, but edge cases
+        # (MinerU timing, naming mismatches) can leave images behind.
+        self._ensure_all_companion_images_propagated(sources_dir, project_dir)
 
         # Stabilize image assets: add short aliases and dimension table
         canvas_format = self._detect_canvas_format(project_dir)

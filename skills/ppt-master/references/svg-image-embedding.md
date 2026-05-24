@@ -86,7 +86,7 @@ Defined in the Design Specification & Content Outline; each image carries an `Ac
 |-------|--------|
 | `xMidYMid meet` | Complete display (similar to CSS `contain`); default for source images |
 | `xMidYMid slice` | Center crop (similar to CSS `cover`); only for decorative `crop-ok` rows |
-| `none` | Stretch to fill, no aspect ratio preservation |
+| `none` | Stretch to fill, no aspect ratio preservation | **⛔ FORBIDDEN for content-bearing images** — only acceptable for full-bleed background images at position (0,0). `svg_quality_checker.py` flags this as an error on non-background images. |
 
 ### Preview Method
 

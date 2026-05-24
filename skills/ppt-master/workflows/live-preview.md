@@ -29,7 +29,7 @@ description: Start the browser SVG editor when it is not running, and apply subm
 **Precondition**: no preview service running on this project.
 
 ```bash
-python3 ${SKILL_DIR}/scripts/start_live_preview.py <project_path>
+${PYTHON} ${SKILL_DIR}/scripts/start_live_preview.py <project_path>
 ```
 
 The wrapper starts `svg_editor/server.py` in the background, waits until it can serve HTTP, prints `LIVE_PREVIEW_URL=...`, opens the browser locally, and exits. The server binds `127.0.0.1:5050` by default and edits `<project_path>/svg_output/` in place. If another preview is already running for a different project, startup switches the preview to the requested project first; if `5050` is still unavailable, it uses another port. The UI also shows current PPT-making progress in the right panel even before the first SVG exists. After startup, tell the user the **actual URL printed by the wrapper** in their language, in one short message:
@@ -50,7 +50,7 @@ Triggered by the user signals listed in "When to Run".
 
 1. Discover annotations:
    ```bash
-   python3 ${SKILL_DIR}/scripts/check_annotations.py <project_path>
+   ${PYTHON} ${SKILL_DIR}/scripts/check_annotations.py <project_path>
    ```
    The output already lists each pending change as `file → element_id → annotation text → content preview`. Use it directly as the to-do list; no need to re-parse SVG attributes yourself.
 2. If the output says no annotations: tell the user, stop.
@@ -59,8 +59,8 @@ Triggered by the user signals listed in "When to Run".
    - Remove `data-edit-target` and `data-edit-annotation` from that element.
 4. Re-export:
    ```bash
-   python3 ${SKILL_DIR}/scripts/finalize_svg.py <project_path>
-   python3 ${SKILL_DIR}/scripts/svg_to_pptx.py <project_path>
+   ${PYTHON} ${SKILL_DIR}/scripts/finalize_svg.py <project_path>
+   ${PYTHON} ${SKILL_DIR}/scripts/svg_to_pptx.py <project_path>
    ```
 5. Tell the user (in their language): annotations applied, new PPTX exported, preview is still running. If the browser still shows the old slide, refresh or reselect the page.
 6. Loop: more annotations submitted → repeat from step 1. User signals done or "stop preview" → end.
@@ -85,9 +85,9 @@ Triggered by the user signals listed in "When to Run".
 If the project lives on a remote Linux server, run with `--no-browser`:
 
 ```bash
-python3 ${SKILL_DIR}/scripts/start_live_preview.py <project_path> --no-browser
+${PYTHON} ${SKILL_DIR}/scripts/start_live_preview.py <project_path> --no-browser
 # or for the main workflow's auto-startup on a remote host:
-python3 ${SKILL_DIR}/scripts/start_live_preview.py <project_path> --no-browser
+${PYTHON} ${SKILL_DIR}/scripts/start_live_preview.py <project_path> --no-browser
 ```
 
 - **VS Code / Cursor Remote-SSH**: open the **PORTS** panel (`Ctrl+Shift+P` → `Ports: Focus on Ports View`), click **Forward a Port**, enter `5050`. The workspace remembers it.

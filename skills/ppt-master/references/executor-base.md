@@ -99,16 +99,17 @@ Before the first SVG page, output a confirmation listing: canvas dimensions, bod
 - Font family from `typography`: use role override (`title_family` / `body_family` / `emphasis_family` / `code_family`) if declared, else fall back to `font_family`
 - Font sizes follow a **ramp anchored on `typography.body`**, not a closed menu. Use the declared slots when they fit. Intermediate sizes (e.g., 40px hero number, 13px annotation) are allowed if the ratio to `body` falls within the role's band (see `design_spec.md §IV ramp table`). Sizes outside every band require extending the lock first.
 - Images MUST reference files listed under `images`; no invented filenames
-- **⛔ IRON RULE — No plain-text formulas** — see [`shared-standards.md §4.1`](shared-standards.md) for the full two-tier system. This is a **blocking error** — the page MUST NOT be saved with raw formula text. Two rendering paths:
-  - **Tier A — simple sub/superscripts** (single-level, 1–3 chars): use `<tspan baseline-shift="sub" font-size="70%">` or `baseline-shift="super"`. Examples: `H<tspan baseline-shift="sub" font-size="70%">2</tspan>O`, `10<tspan baseline-shift="super" font-size="70%">-9</tspan>`, `T<tspan baseline-shift="sub" font-size="70%">e</tspan>`. The converter maps this to native DrawingML `baseline` — editable, font-consistent.
-  - **Tier B — complex formulas** (fractions, radicals, integrals, multi-level, full equations): generate via `latex_to_svg.py` → embed as `<image>`:
+- **⛔ IRON RULE — No plain-text formulas / SVG-FIRST** — see [`shared-standards.md §4.1`](shared-standards.md) for the full rules. This is a **blocking error** — the page MUST NOT be saved with raw formula text. **NEVER split a formula across multiple `<text>` elements.** SVG-first policy:
+  - **DEFAULT: Tier B — SVG image for ALL formulas** — including simple sub/superscripts (10², H₂O, Tₑ, m²). Before writing each page, call `latex_to_svg.py` for every formula-like expression:
     ```
     python3 ${SKILL_DIR}/scripts/latex_to_svg.py "<latex_expression>" -o <project_path>/images/formula_inline_<NNN>.svg
     ```
-    Use counter `<NNN>` starting from 901.
-  - **Mandatory pre-scan**: before writing each SVG page, scan ALL planned text. Decide Tier A vs Tier B per the §4.1 criteria. Raw patterns (`a_1`, `x^2`, `a/b`, `√x`, bare `²`) without `baseline-shift` or `<image>` are **blocking errors**.
-  - Common Tier A traps: `H₂O` → `H<tspan baseline-shift="sub" font-size="70%">2</tspan>O`; `m²` → `m<tspan baseline-shift="super" font-size="70%">2</tspan>`; `10⁻⁹` → `10<tspan baseline-shift="super" font-size="70%">-9</tspan>`
-  - Common Tier B traps: `a/b` → `\frac{a}{b}`; `√x` → `\sqrt{x}`; `∑_{i=1}^{n}` → `\sum_{i=1}^{n}`; any full equation
+    Then embed as `<image href="../images/formula_inline_<NNN>.svg" .../>`. Counter `<NNN>` from 901.
+  - **EXCEPTION ONLY: Tier A — baseline-shift** — permitted ONLY when ALL of: (a) single sub/super of 1–2 chars, (b) inline in prose where `<image>` breaks text flow, (c) max 1 Tier A per page. If in doubt, use Tier B.
+  - **Mandatory pre-scan**: before writing each SVG page, scan ALL planned text. Generate formula SVGs **before** writing the page. Raw patterns (`a_1`, `x^2`, `a/b`, `√x`) without `<image>` or `baseline-shift` are **blocking errors**.
+  - Common formulas that MUST use Tier B (not Tier A): `H₂O` → `latex_to_svg.py "\mathrm{H_2O}"`; `10²` → `latex_to_svg.py "10^{2}"`; `Tₑ` → `latex_to_svg.py "T_e"`
+  - **⛔ FORBIDDEN — formula avoidance by text substitution**: when the quality checker flags a formula, the ONLY fix is `latex_to_svg.py` → `<image>`. Replacing the formula with plain text (e.g. `φ_burst` → "破裂填充比", `P = C₁ε^C₂/(1+C₃ε^C₄)` → "四参数 S 型曲线", `x/y` → "x与y") is **strictly forbidden** — it destroys scientific meaning. Always generate the SVG and embed it.
+  - **⛔ FORBIDDEN — formula removal by rewording**: deleting the mathematical symbol and rewording the sentence is equally forbidden. Examples of violations: `v_⊥²/(v²B) 较大` → "低速粒子", `v_∥ 足够大` → "平行速度分量足够大", `v_∥ 大于阈值` → "平行速度超过阈值". These hide scientific content behind vague natural-language descriptions. The ONLY correct response is: (1) run `latex_to_svg.py` to render the formula, (2) embed the SVG via `<image>`, (3) keep the original mathematical notation intact. If the formula cannot compile, fix the LaTeX source — never delete the formula.
 
 If a page needs a value not in `spec_lock.md`, surface it — do not silently invent one.
 
@@ -157,7 +158,7 @@ Before drawing each page, look up its entry in `page_charts` to decide which cha
 - **Generation rhythm**: lock global design context first, then generate pages sequentially in one continuous context. No batched groups (e.g., 5 at a time).
 - **Phased batch generation** (recommended):
   1. **Visual Construction Phase**: generate all SVG pages sequentially for visual consistency. Use layout judgment for chart marks during the draft. **MUST embed plot-area markers** per §3.1 below on every chart page — coordinate calibration is a post-generation step (see [`workflows/verify-charts.md`](../workflows/verify-charts.md)) that depends on these markers.
-  2. **Quality Check Gate**: run `python3 scripts/svg_quality_checker.py <project_path>` on `svg_output/`. Any `error` (banned features, viewBox mismatch, spec_lock drift, non-PPT-safe font, etc.) MUST be fixed on the offending page before proceeding — regenerate and re-check. Address `warning`s when straightforward. Do NOT defer to after `finalize_svg.py` — finalize rewrites SVG and masks some violations.
+  2. **Quality Check Gate**: run `python3 scripts/svg_quality_checker.py <project_path>` on `svg_output/`. **Every `error` is a BLOCKING gate** — formula violations, `preserveAspectRatio="none"`, banned features, viewBox mismatch, spec_lock drift, non-PPT-safe font, etc. You MUST fix each error on the offending page and re-run the checker until 0 errors remain. Do NOT skip or defer errors and proceed to export — that defeats the quality gate. Address `warning`s when straightforward. Do NOT defer to after `finalize_svg.py` — finalize rewrites SVG and masks some violations.
   3. **Logic Construction Phase**: after SVGs pass the quality check, batch-generate speaker notes for narrative continuity.
 
 ### 3.1 Chart Plot-Area Marker (MANDATORY on every chart page)
@@ -315,7 +316,7 @@ Handle images by their status in the Design Spec's Image Resource List. Status e
 | Status | Source | Handling |
 |--------|--------|----------|
 | **Existing** | User-provided | Reference images directly from `../images/` directory |
-| **Formula SVG** | LaTeX-rendered (`formula_*.svg`) | ⛔ IRON RULE — complex formulas (Tier B) MUST be embedded via `<image href="../images/formula_XXX.svg" .../>`. Simple sub/superscripts (Tier A) use `<tspan baseline-shift="sub/super" font-size="70%">` instead. See [`shared-standards.md §4.1`](shared-standards.md). Use `short_alias` from `image_asset_table.md` for lookup. If a Tier B formula on this page has no pre-rendered SVG, generate it on-the-fly with `latex_to_svg.py "<expr>" -o <project>/images/formula_inline_<NNN>.svg` (counter from 901) before writing the page |
+| **Formula SVG** | LaTeX-rendered (`formula_*.svg`) | ⛔ IRON RULE — ALL formulas (including simple sub/super like 10², H₂O) MUST be embedded via `<image href="../images/formula_XXX.svg" .../>` by default. Generate with `latex_to_svg.py "<expr>" -o <project>/images/formula_inline_<NNN>.svg` (counter from 901). Tier A (`baseline-shift`) is a narrow exception — see [`shared-standards.md §4.1`](shared-standards.md). Use `short_alias` from `image_asset_table.md` for lookup |
 | **Generated** | Generated by Image_Generator | Reference images directly from `../images/` directory |
 | **Sourced** | Web-acquired by Image_Searcher | Reference from `../images/`. **Read [`image_sources.json`](image-searcher.md) to decide attribution** — see §6.1 below. |
 | **Needs-Manual** | Acquisition failed and file is absent | Use dashed border placeholder unless the expected file exists |
@@ -337,6 +338,8 @@ Handle images by their status in the Design Spec's Image Resource List. Status e
 | `crop-ok` | Only when the image row is a decorative background / atmosphere / full-bleed cover and edge loss does not remove information | Use `preserveAspectRatio="xMidYMid slice"` and add overlays as needed |
 
 **Forbidden**: do not crop source charts, screenshots, paper figures, dense diagrams, product photos, or user-provided evidence images just to fill a fixed box. Change the page composition instead.
+
+**⛔ No Stretching**: `preserveAspectRatio="none"` is FORBIDDEN on content-bearing images. It distorts originals and misrepresents source data. The only exception is a full-bleed background at `x="0" y="0"` covering the entire canvas. `svg_quality_checker.py` flags violations as blocking errors — you must fix them before proceeding.
 
 ### 6.1 Inline Attribution for Sourced Images (web path)
 

@@ -71,6 +71,37 @@ DEFAULT_PREVIEW_PORT = 5050
 # Check helpers — each returns (passed: bool, message: str)
 # ------------------------------------------------------------------
 
+def detect_python_command() -> str:
+    """Detect a working Python >= 3.10 command for this system.
+
+    Tries candidates in order: python3, python, py -3.
+    On Windows the Microsoft Store ``python3.exe`` alias returns exit
+    code 49 when no real install backs it, so we verify each candidate
+    actually runs and reports a valid version.
+
+    Returns the first working command string (e.g. ``python3``,
+    ``python``, or ``py -3``).  Raises RuntimeError if none works.
+    """
+    candidates = ["python3", "python", "py -3"]
+    for cmd in candidates:
+        try:
+            parts = cmd.split()
+            result = subprocess.run(
+                [*parts, "-c", "import sys; print(sys.version_info[:2])"],
+                capture_output=True, text=True, timeout=10,
+            )
+            if result.returncode != 0:
+                continue
+            version_tuple = eval(result.stdout.strip())  # e.g. (3, 11)
+            if version_tuple >= MIN_PYTHON:
+                return cmd
+        except (FileNotFoundError, subprocess.TimeoutExpired, Exception):
+            continue
+    raise RuntimeError(
+        "No working Python >= 3.10 found. Tried: " + ", ".join(candidates)
+    )
+
+
 def _check_python_version() -> tuple[bool, str]:
     v = sys.version_info
     version_str = f"{v.major}.{v.minor}.{v.micro}"
@@ -223,6 +254,14 @@ def run_preflight(
     ok, msg = _check_python_version()
     _record("python", ok, msg)
 
+    # Detect the correct Python command for this system
+    try:
+        python_cmd = detect_python_command()
+        _record("python", True, f"Python command: {python_cmd}")
+    except RuntimeError as exc:
+        python_cmd = "python3"
+        _record("python", False, str(exc))
+
     # Required packages
     for ok, msg in _check_required_packages():
         _record("dependency", ok, msg)
@@ -260,6 +299,7 @@ def run_preflight(
 
     return {
         "project": str(project_dir),
+        "python_cmd": python_cmd,
         "all_passed": not has_error,
         "checks": checks,
     }
@@ -273,6 +313,8 @@ def print_report(report: dict[str, object]) -> None:
     print("\n" + "=" * 60, file=sys.stderr)
     print("PPT Master — Preflight Check", file=sys.stderr)
     print(f"Project: {report.get('project', '?')}", file=sys.stderr)
+    python_cmd = report.get("python_cmd", "python3")
+    print(f"Python command: {python_cmd}", file=sys.stderr)
     print("=" * 60, file=sys.stderr)
 
     current_category = ""
@@ -292,7 +334,9 @@ def print_report(report: dict[str, object]) -> None:
     else:
         failed = [c for c in checks if not c.get("passed")]
         print(f"  Result: {len(failed)} issue(s) found", file=sys.stderr)
-    print("=" * 60 + "\n", file=sys.stderr)
+    print("=" * 60, file=sys.stderr)
+    # Machine-readable line for AI agents to parse the Python command
+    print(f"\nPYTHON_CMD={python_cmd}", file=sys.stderr)
 
 
 # ------------------------------------------------------------------

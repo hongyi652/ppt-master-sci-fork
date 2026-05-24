@@ -48,47 +48,54 @@ PPT Master is an AI-driven presentation generation system. Multi-role collaborat
 
 Convenience summary only — full workflow in [`skills/ppt-master/SKILL.md`](skills/ppt-master/SKILL.md).
 
+> **Python command**: All examples below use `python3` as a placeholder. On Windows, `python3` may point to a Microsoft Store stub (exit code 49). **Detect the working command first** by trying `python3 --version`, `python --version`, `py -3 --version` in order — use whichever succeeds. `preflight_check.py` auto-detects and prints `PYTHON_CMD=<cmd>`. Use that value for the entire session.
+
 ```bash
+# Python detection (run FIRST in every session)
+# Try: python3 --version / python --version / py -3 --version
+# Use the first one that works as ${PYTHON} below.
+# preflight_check.py also prints PYTHON_CMD=<cmd> for you.
+
 # Source content conversion
-python3 skills/ppt-master/scripts/convert_pdf.py <PDF_file>                          # stable wrapper: proxy/SSL, retry, zip, report
-python3 skills/ppt-master/scripts/source_to_md/mineru_to_md.py <PDF_file>            # direct MinerU call
-python3 skills/ppt-master/scripts/source_to_md/doc_to_md.py <DOCX_or_other_file>
-python3 skills/ppt-master/scripts/source_to_md/excel_to_md.py <XLSX_or_XLSM_file>
-python3 skills/ppt-master/scripts/source_to_md/ppt_to_md.py <PPTX_file>
-python3 skills/ppt-master/scripts/source_to_md/web_to_md.py <URL>
+${PYTHON} skills/ppt-master/scripts/convert_pdf.py <PDF_file>                          # stable wrapper: proxy/SSL, retry, zip, report
+${PYTHON} skills/ppt-master/scripts/source_to_md/mineru_to_md.py <PDF_file>            # direct MinerU call
+${PYTHON} skills/ppt-master/scripts/source_to_md/doc_to_md.py <DOCX_or_other_file>
+${PYTHON} skills/ppt-master/scripts/source_to_md/excel_to_md.py <XLSX_or_XLSM_file>
+${PYTHON} skills/ppt-master/scripts/source_to_md/ppt_to_md.py <PPTX_file>
+${PYTHON} skills/ppt-master/scripts/source_to_md/web_to_md.py <URL>
 
 # Pre-run checks
-python3 skills/ppt-master/scripts/preflight_check.py <project_path>                  # environment + project sanity check
+${PYTHON} skills/ppt-master/scripts/preflight_check.py <project_path>                  # environment + project sanity check
 
 # Project management
-python3 skills/ppt-master/scripts/project_manager.py init <project_name> --format ppt169
-python3 skills/ppt-master/scripts/project_manager.py import-sources <project_path> <source_files_or_URLs...> --move
-python3 skills/ppt-master/scripts/project_manager.py validate <project_path>
+${PYTHON} skills/ppt-master/scripts/project_manager.py init <project_name> --format ppt169
+${PYTHON} skills/ppt-master/scripts/project_manager.py import-sources <project_path> <source_files_or_URLs...> --move
+${PYTHON} skills/ppt-master/scripts/project_manager.py validate <project_path>
 
 # Image tools and SVG quality check
-python3 skills/ppt-master/scripts/analyze_images.py <project_path>/images
-python3 skills/ppt-master/scripts/stabilize_image_assets.py <project_path>            # short aliases + dimension table
+${PYTHON} skills/ppt-master/scripts/analyze_images.py <project_path>/images
+${PYTHON} skills/ppt-master/scripts/stabilize_image_assets.py <project_path>            # short aliases + dimension table
 # In-pipeline AI image generation — manifest mode (required, even for 1 image):
-python3 skills/ppt-master/scripts/image_gen.py --manifest <project_path>/images/image_prompts.json
-python3 skills/ppt-master/scripts/image_gen.py --render-md <project_path>/images/image_prompts.json
+${PYTHON} skills/ppt-master/scripts/image_gen.py --manifest <project_path>/images/image_prompts.json
+${PYTHON} skills/ppt-master/scripts/image_gen.py --render-md <project_path>/images/image_prompts.json
 # Out-of-pipeline one-off / debug / single-image fixup only (no manifest, no sidecar):
-python3 skills/ppt-master/scripts/image_gen.py "prompt" --aspect_ratio 16:9 --image_size 1K -o <project_path>/images
+${PYTHON} skills/ppt-master/scripts/image_gen.py "prompt" --aspect_ratio 16:9 --image_size 1K -o <project_path>/images
 
 # LaTeX formula extraction and SVG rendering (requires latex + dvisvgm on PATH)
-python3 skills/ppt-master/scripts/extract_formulas.py <markdown_file> -o <project_path>/images/formula_manifest.json
-python3 skills/ppt-master/scripts/latex_to_svg.py --manifest <project_path>/images/formula_manifest.json
+${PYTHON} skills/ppt-master/scripts/extract_formulas.py <markdown_file> -o <project_path>/images/formula_manifest.json
+${PYTHON} skills/ppt-master/scripts/latex_to_svg.py --manifest <project_path>/images/formula_manifest.json
 # Single formula one-off:
-python3 skills/ppt-master/scripts/latex_to_svg.py "E=mc^2" -o formula.svg
+${PYTHON} skills/ppt-master/scripts/latex_to_svg.py "E=mc^2" -o formula.svg
 
-python3 skills/ppt-master/scripts/start_live_preview.py <project_path>
-python3 skills/ppt-master/scripts/svg_quality_checker.py <project_path>
-python3 skills/ppt-master/scripts/animation_config.py scaffold <project_path>  # optional, only for custom object-level animation
-python3 skills/ppt-master/scripts/animation_config.py validate <project_path>  # optional, before re-export
+${PYTHON} skills/ppt-master/scripts/start_live_preview.py <project_path>
+${PYTHON} skills/ppt-master/scripts/svg_quality_checker.py <project_path>
+${PYTHON} skills/ppt-master/scripts/animation_config.py scaffold <project_path>  # optional, only for custom object-level animation
+${PYTHON} skills/ppt-master/scripts/animation_config.py validate <project_path>  # optional, before re-export
 
 # Post-processing pipeline: run sequentially, one command at a time
-python3 skills/ppt-master/scripts/total_md_split.py <project_path>
-python3 skills/ppt-master/scripts/finalize_svg.py <project_path>
-python3 skills/ppt-master/scripts/svg_to_pptx.py <project_path>
+${PYTHON} skills/ppt-master/scripts/total_md_split.py <project_path>
+${PYTHON} skills/ppt-master/scripts/finalize_svg.py <project_path>
+${PYTHON} skills/ppt-master/scripts/svg_to_pptx.py <project_path>
 # Add --merge-paragraphs when the user wants paragraph-level editable text frames instead of one-per-line (default off, see SKILL.md Step 7.3).
 ```
 
