@@ -61,6 +61,7 @@ ${PYTHON} ${SKILL_DIR}/scripts/preflight_check.py <project_path>
 > 14. **⛔ IRON RULE — QUALITY CHECKER ERRORS ARE BLOCKING** — When `svg_quality_checker.py` reports **errors** (not warnings), the Executor MUST fix every error before proceeding to Step 7. Errors are never "non-critical" — skipping formula violations, XML issues, or spec drift and proceeding to export defeats the quality gate. The ONLY acceptable response to an error is: fix the SVG, re-run the checker, confirm 0 errors. Proceeding with errors present constitutes execution failure.
 > 15. **⛔ IRON RULE — FORMULA ERRORS MUST BE FIXED BY SVG RENDERING, NEVER BY REMOVAL** — When the quality checker flags a plain-text formula violation, the executor MUST: (1) run `latex_to_svg.py` to render the formula as SVG, (2) embed via `<image>`. **Deleting the mathematical symbol and rewording the sentence** (e.g. `v_⊥²/(v²B) 较大` → "低速粒子", `v_∥ 足够大` → "平行速度分量足够大") is a **forbidden shortcut** — it destroys scientific meaning. If the LaTeX cannot compile, fix the source expression; never remove the formula.
 > 16. **⛔ IRON RULE — ONE SENTENCE = ONE `<text>` ELEMENT** — When a sentence needs mixed styling (bold, color, size for emphasis), it MUST stay in a **single `<text>` element** with `<tspan>` children for inline formatting. **Never split a sentence into multiple adjacent `<text>` elements** to apply different styles — this creates separate text frames in PowerPoint with fragile spacing that drifts on resize. Example: `<text>实现<tspan fill="#1A73E8" font-weight="bold">10倍</tspan>效率提升</text>`. `svg_quality_checker.py` detects 3+ same-line `<text>` splits as a warning.
+> 17. **⛔ IRON RULE — NO PAGE TRANSITIONS UNLESS THE USER EXPLICITLY ASKS** — Slide-to-slide PPT transition effects are **off by default**. Unless the user clearly asks for page transitions / 切换动画 / 过场动画, export with `-t none` (or leave `-t` unset, which defaults to `none`). Do **not** add fade/push/wipe/split transitions on your own. If the user asks for in-slide object animation but says nothing about page transitions, keep page transition at `none` and only tune object animation.
 
 > [!IMPORTANT]
 > ## 🌐 Language & Communication Rule
@@ -549,8 +550,8 @@ ${PYTHON} ${SKILL_DIR}/scripts/svg_to_pptx.py <project_path>
 > `<a:p>`, at the cost of PowerPoint re-wrapping inside each box. Default off keeps
 > pixel-fidelity; turn it on per the user's request, not on your own judgement.
 
-**Optional animation flags** (the defaults already enable rich entrance animations — adjust only when the user asks for something different):
-- `-t <effect>` — page transition. Default `fade`. Options: `fade` / `push` / `wipe` / `split` / `strips` / `cover` / `random` / `none`.
+**Optional animation flags** (page transitions default off; per-element entrance animations keep their global defaults unless the user asks otherwise):
+- `-t <effect>` — page transition. Default `none`. Options: `none` / `fade` / `push` / `wipe` / `split` / `strips` / `cover` / `random`. Only enable when the user explicitly asks for slide transitions.
 - `-a <effect>` — per-element entrance animation. Default `auto` (map effect from group id: chart→wipe, card-/step-/pillar-→fly, title/takeaway→fade; image-like ids `hero` / `figure-` / `image` / `img-` / `kpi` cycle a richer pool — zoom / dissolve / circle / box / diamond / wheel — so multiple images vary across the deck). Pass `none` to disable, a specific effect like `fade`, or `mixed` for the legacy 16-effect cycle. Requires top-level `<g id="...">` groups (already required by Executor).
 - `--animation-trigger {on-click,with-previous,after-previous}` — Start mode (matches PowerPoint's animation-pane Start dropdown). Default `after-previous` (click-free cascade; pace via `--animation-stagger`). Use `on-click` for presenter-paced reveals, or `with-previous` for all-at-once.
 - `--animation-config <path>` — optional object-level sidecar. Default: `<project_path>/animations.json` when present.
@@ -558,7 +559,7 @@ ${PYTHON} ${SKILL_DIR}/scripts/svg_to_pptx.py <project_path>
 
 **Optional custom animations** (only when the user asks to tune animation order/effects/timing for specific objects):
 
-Run the standalone [`customize-animations`](workflows/customize-animations.md) workflow. Default export already has global entrance animation; do not create `animations.json` unless object-level customization was requested.
+Run the standalone [`customize-animations`](workflows/customize-animations.md) workflow. Default export has **no page transition**; global entrance animation may still be present. Do not create `animations.json` unless object-level customization was requested.
 
 **Optional recorded narration** (only when the user asks for narrated/video export):
 

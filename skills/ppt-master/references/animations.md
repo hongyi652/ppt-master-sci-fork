@@ -6,14 +6,14 @@ PPT Master's exported PPTX supports **page transitions** (slide-to-slide) and **
 
 | Layer | Default | Why |
 |---|---|---|
-| Page transition | `fade`, 0.4s | Calm baseline that suits most decks |
+| Page transition | `none` | Avoid adding slide-to-slide motion unless the user explicitly asks for it |
 | Per-element animation | `auto` effect + `after-previous` trigger, 0.4s duration + 0.5s stagger | Effects are mapped from group id (chart→wipe, card-/step-/pillar-→fly, title/takeaway→fade); image-like ids (`hero` / `figure-` / `image` / `img-` / `kpi`) cycle a richer visual pool (zoom / dissolve / circle / box / diamond / wheel) so multiple images vary across the deck; unmatched ids cycle a small fade/wipe/fly/zoom pool. Cascades automatically on slide entry — zero interaction |
 
-To regenerate a deck with different settings, rerun `svg_to_pptx.py` against the same `svg_output/` (or `svg_final/`) — no need to rerun the LLM. To turn per-element animation off entirely, pass `-a none`.
+To regenerate a deck with different settings, rerun `svg_to_pptx.py` against the same `svg_output/` (or `svg_final/`) — no need to rerun the LLM. Slide transitions stay off unless you pass `-t <effect>` or set `defaults.transition.effect` in `animations.json`. To turn per-element animation off entirely, pass `-a none`.
 
 ## Custom Object-Level Animation
 
-Default animation is global. When a deck needs specific object timing — for example title first, chart second, annotation last — use the optional `animations.json` sidecar. The SVG remains static visual source; the sidecar only controls PPTX export behavior.
+Default entrance animation is global; page transition default is `none`. When a deck needs specific object timing — for example title first, chart second, annotation last — use the optional `animations.json` sidecar. The SVG remains static visual source; the sidecar only controls PPTX export behavior.
 
 Run the standalone [`customize-animations`](../workflows/customize-animations.md) workflow when the user asks to tune animation order, effects, timing, or object-level reveals.
 

@@ -77,7 +77,7 @@ Examples:
     %(prog)s examples/ppt169_demo --only legacy          # Only SVG image version (skips native)
     %(prog)s examples/ppt169_demo -o out.pptx            # Explicit path (no backup/)
 
-    # Disable transition / change transition effect
+    # Explicitly disable or change transition effect
     %(prog)s examples/ppt169_demo -t none
     %(prog)s examples/ppt169_demo -t push --transition-duration 1.0
 
@@ -182,9 +182,9 @@ Recorded narration:
         return number
 
     parser.add_argument('-t', '--transition', type=str, choices=transition_choices, default=None,
-                        help='Page transition effect (default: fade, use "none" to disable)')
+                        help='Page transition effect (default: none; set explicitly to enable)')
     parser.add_argument('--transition-duration', type=non_negative_float, default=None,
-                        help='Transition duration in seconds (default: 0.4)')
+                        help='Transition duration in seconds when a transition is enabled (default: 0.4)')
     parser.add_argument('--auto-advance', type=non_negative_float, default=None,
                         help='Auto-advance interval in seconds (default: manual advance)')
 
@@ -411,7 +411,7 @@ Recorded narration:
     transition_effect = (
         transition_arg
         if transition_arg is not None
-        else transition_defaults.get('effect', 'fade')
+        else transition_defaults.get('effect', 'none')
     )
     transition = None if transition_effect == 'none' else transition_effect
     transition_duration = (

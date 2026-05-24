@@ -4,7 +4,7 @@ description: Customize default PPTX animations with per-slide and per-object tim
 
 # Customize Animations Workflow
 
-> Standalone post-generation step. Run when the user asks to tune animation order, effects, timing, or object-level reveals. Default PPTX export already has global animations; this workflow only creates `animations.json` overrides when the user wants finer control.
+> Standalone post-generation step. Run when the user asks to tune animation order, effects, timing, or object-level reveals. Default PPTX export has no page transitions; this workflow creates `animations.json` overrides only when the user wants finer control over transitions or object-level reveals.
 
 ## When to Run
 
