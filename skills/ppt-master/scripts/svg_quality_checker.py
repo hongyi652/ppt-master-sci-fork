@@ -602,6 +602,48 @@ class SVGQualityChecker:
                 f"Detected {len(text_matches)} potentially overly long single-line text(s) (consider using tspan for wrapping)"
             )
 
+    @staticmethod
+    def _parse_svg_number(value: str | None) -> float | None:
+        """Best-effort SVG numeric attribute parser."""
+        if value is None:
+            return None
+        try:
+            return float(re.sub(r'(px|pt|em|%|rem)$', '', value.strip()))
+        except (TypeError, ValueError, AttributeError):
+            return None
+
+    @staticmethod
+    def _parse_image_par(value: str | None) -> tuple[str, str]:
+        """Parse preserveAspectRatio into ``(align, mode)``."""
+        raw = (value or 'xMidYMid meet').strip()
+        if not raw:
+            return 'xMidYMid', 'meet'
+        parts = raw.split()
+        align = parts[0]
+        if align.lower() == 'none':
+            return 'none', 'none'
+        mode = parts[1] if len(parts) > 1 else 'meet'
+        return align, mode
+
+    def _effective_image_display_size(
+        self,
+        actual_w: float,
+        actual_h: float,
+        box_w: float,
+        box_h: float,
+        preserve_aspect_ratio: str | None,
+    ) -> tuple[float, float]:
+        """Return the real rendered image size inside an SVG image box."""
+        align, mode = self._parse_image_par(preserve_aspect_ratio)
+        if align == 'none' or actual_w <= 0 or actual_h <= 0 or box_w <= 0 or box_h <= 0:
+            return box_w, box_h
+
+        if mode == 'slice':
+            scale = max(box_w / actual_w, box_h / actual_h)
+        else:
+            scale = min(box_w / actual_w, box_h / actual_h)
+        return actual_w * scale, actual_h * scale
+
     def _check_image_references(self, content: str, svg_path: Path, result: Dict):
         """Check image file existence and resolution vs display size."""
         # Find all <image ...> elements (capture the full tag)
@@ -640,11 +682,12 @@ class SVGQualityChecker:
             # stretched.
             par_match = re.search(
                 r'\bpreserveAspectRatio="([^"]*)"', attrs)
-            if par_match and par_match.group(1).strip().lower() == 'none':
+            par_value = par_match.group(1).strip() if par_match else None
+            if par_value and par_value.lower() == 'none':
                 x_match = re.search(r'\bx="([^"]*)"', attrs)
                 y_match = re.search(r'\by="([^"]*)"', attrs)
-                x_val = float(x_match.group(1)) if x_match else -1
-                y_val = float(y_match.group(1)) if y_match else -1
+                x_val = self._parse_svg_number(x_match.group(1)) if x_match else -1
+                y_val = self._parse_svg_number(y_match.group(1)) if y_match else -1
                 is_full_bleed_bg = (x_val == 0 and y_val == 0)
                 if not is_full_bleed_bg:
                     result['errors'].append(
@@ -663,8 +706,10 @@ class SVGQualityChecker:
                 continue
 
             try:
-                display_w = float(display_w_str)
-                display_h = float(display_h_str)
+                display_w = self._parse_svg_number(display_w_str)
+                display_h = self._parse_svg_number(display_h_str)
+                if display_w is None or display_h is None:
+                    continue
             except (ValueError, TypeError):
                 continue
 
@@ -673,14 +718,24 @@ class SVGQualityChecker:
                 with PILImage.open(img_path) as img:
                     actual_w, actual_h = img.size
 
-                if actual_w < display_w or actual_h < display_h:
+                effective_w, effective_h = self._effective_image_display_size(
+                    actual_w,
+                    actual_h,
+                    display_w,
+                    display_h,
+                    par_value,
+                )
+                if effective_w <= 0 or effective_h <= 0:
+                    continue
+
+                if actual_w < effective_w or actual_h < effective_h:
                     result['warnings'].append(
                         f"Image {href} is {actual_w}x{actual_h} but displayed at "
-                        f"{int(display_w)}x{int(display_h)} — may appear blurry")
-                elif actual_w > display_w * 4 and actual_h > display_h * 4:
+                        f"{int(effective_w)}x{int(effective_h)} — may appear blurry")
+                elif actual_w > effective_w * 4 and actual_h > effective_h * 4:
                     result['warnings'].append(
                         f"Image {href} is {actual_w}x{actual_h} but displayed at "
-                        f"{int(display_w)}x{int(display_h)} — consider downsizing "
+                        f"{int(effective_w)}x{int(effective_h)} — consider downsizing "
                         f"to reduce file size")
             except ImportError:
                 pass  # PIL not available, skip resolution check

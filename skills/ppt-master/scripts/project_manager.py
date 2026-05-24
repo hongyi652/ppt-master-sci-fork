@@ -15,6 +15,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
@@ -650,6 +651,62 @@ class ProjectManager:
             "notes": [],
             "skipped": [],
         }
+        import_started_at = datetime.now()
+        import_start = time.perf_counter()
+        stage_report: list[dict[str, object]] = []
+
+        def _begin_stage(name: str, detail: str = "") -> float:
+            label = f"[stage] {name}"
+            if detail:
+                label += f": {detail}"
+            print(label, file=sys.stderr)
+            return time.perf_counter()
+
+        def _finish_stage(
+            name: str,
+            started: float,
+            *,
+            detail: str = "",
+            status: str = "ok",
+            error: str | None = None,
+        ) -> None:
+            elapsed = round(time.perf_counter() - started, 3)
+            stage: dict[str, object] = {
+                "name": name,
+                "status": status,
+                "elapsed_seconds": elapsed,
+            }
+            if detail:
+                stage["detail"] = detail
+            if error:
+                stage["error"] = error
+            stage_report.append(stage)
+
+            label = f"[stage] {name}: {status} ({elapsed:.2f}s)"
+            if detail:
+                label += f" - {detail}"
+            if error:
+                label += f" - {error}"
+            print(label, file=sys.stderr)
+
+        def _write_import_report() -> None:
+            notes_dir = project_dir / "notes"
+            notes_dir.mkdir(parents=True, exist_ok=True)
+            report_path = notes_dir / "import_sources_report.json"
+            report = {
+                "project": str(project_dir),
+                "source_items": source_items,
+                "started_at": import_started_at.isoformat(timespec="seconds"),
+                "finished_at": datetime.now().isoformat(timespec="seconds"),
+                "elapsed_seconds": round(time.perf_counter() - import_start, 3),
+                "summary": summary,
+                "stages": stage_report,
+            }
+            report_path.write_text(
+                json.dumps(report, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
         explicit_markdown_stems = {
             Path(item).stem
             for item in source_items
@@ -661,15 +718,26 @@ class ProjectManager:
 
         for item in source_items:
             if is_url(item):
+                stage_start = _begin_stage("archive_url", item)
                 archived = self._archive_url_record(sources_dir, item)
+                _finish_stage("archive_url", stage_start, detail=item)
                 markdown_path = self._ensure_unique_path(
                     sources_dir / f"{derive_url_basename(item)}.md"
                 )
+                stage_start = _begin_stage("convert_url", item)
                 try:
                     self._import_url(item, markdown_path)
                 except Exception as exc:  # pragma: no cover - summary path
+                    _finish_stage(
+                        "convert_url",
+                        stage_start,
+                        detail=item,
+                        status="failed",
+                        error=str(exc),
+                    )
                     summary["skipped"].append(f"{item}: {exc}")
                     continue
+                _finish_stage("convert_url", stage_start, detail=item)
 
                 summary["archived"].append(str(archived))
                 summary["markdown"].append(str(markdown_path))
@@ -728,11 +796,13 @@ class ProjectManager:
                     )
                     continue
 
+                stage_start = _begin_stage("archive_markdown", str(source_path))
                 archived_markdown, asset_dir, note = self._import_markdown_with_assets(
                     source_path,
                     sources_dir,
                     move=effective_move,
                 )
+                _finish_stage("archive_markdown", stage_start, detail=str(source_path))
                 summary["archived"].append(str(archived_markdown))
                 summary["markdown"].append(str(archived_markdown))
                 if asset_dir is not None:
@@ -742,11 +812,13 @@ class ProjectManager:
                     summary["notes"].append(note)
                 continue
 
+            stage_start = _begin_stage("archive_source", str(source_path))
             archived_path = self._copy_or_move_file(
                 source_path,
                 sources_dir / source_path.name,
                 move=effective_move,
             )
+            _finish_stage("archive_source", stage_start, detail=str(source_path))
             summary["archived"].append(str(archived_path))
 
             if suffix in PDF_SUFFIXES:
@@ -764,11 +836,20 @@ class ProjectManager:
                     )
                     continue
                 markdown_path = canonical_markdown_path
+                stage_start = _begin_stage("convert_pdf", str(archived_path))
                 try:
                     self._import_pdf(archived_path, markdown_path)
+                    _finish_stage("convert_pdf", stage_start, detail=str(archived_path))
                     summary["markdown"].append(str(markdown_path))
                     self._propagate_companion_image_assets(markdown_path, project_dir)
                 except Exception as exc:  # pragma: no cover - summary path
+                    _finish_stage(
+                        "convert_pdf",
+                        stage_start,
+                        detail=str(archived_path),
+                        status="failed",
+                        error=str(exc),
+                    )
                     summary["skipped"].append(f"{item}: PDF conversion failed ({exc})")
             elif suffix in PRESENTATION_SUFFIXES:
                 canonical_markdown_path = sources_dir / f"{archived_path.stem}.md"
@@ -785,11 +866,20 @@ class ProjectManager:
                     )
                     continue
                 markdown_path = canonical_markdown_path
+                stage_start = _begin_stage("convert_presentation", str(archived_path))
                 try:
                     self._import_presentation(archived_path, markdown_path)
+                    _finish_stage("convert_presentation", stage_start, detail=str(archived_path))
                     summary["markdown"].append(str(markdown_path))
                     self._propagate_companion_image_assets(markdown_path, project_dir)
                 except Exception as exc:  # pragma: no cover - summary path
+                    _finish_stage(
+                        "convert_presentation",
+                        stage_start,
+                        detail=str(archived_path),
+                        status="failed",
+                        error=str(exc),
+                    )
                     summary["skipped"].append(f"{item}: presentation conversion failed ({exc})")
             elif suffix in EXCEL_SUFFIXES:
                 canonical_markdown_path = sources_dir / f"{archived_path.stem}.md"
@@ -806,11 +896,20 @@ class ProjectManager:
                     )
                     continue
                 markdown_path = canonical_markdown_path
+                stage_start = _begin_stage("convert_excel", str(archived_path))
                 try:
                     self._import_excel(archived_path, markdown_path)
+                    _finish_stage("convert_excel", stage_start, detail=str(archived_path))
                     summary["markdown"].append(str(markdown_path))
                     self._propagate_companion_image_assets(markdown_path, project_dir)
                 except Exception as exc:  # pragma: no cover - summary path
+                    _finish_stage(
+                        "convert_excel",
+                        stage_start,
+                        detail=str(archived_path),
+                        status="failed",
+                        error=str(exc),
+                    )
                     summary["skipped"].append(f"{item}: Excel conversion failed ({exc})")
             elif suffix in LEGACY_EXCEL_SUFFIXES:
                 summary["notes"].append(
@@ -836,19 +935,32 @@ class ProjectManager:
                     )
                     continue
                 markdown_path = canonical_markdown_path
+                stage_start = _begin_stage("convert_document", str(archived_path))
                 try:
                     self._import_doc(archived_path, markdown_path)
+                    _finish_stage("convert_document", stage_start, detail=str(archived_path))
                     summary["markdown"].append(str(markdown_path))
                     self._propagate_companion_image_assets(markdown_path, project_dir)
                 except Exception as exc:  # pragma: no cover - summary path
+                    _finish_stage(
+                        "convert_document",
+                        stage_start,
+                        detail=str(archived_path),
+                        status="failed",
+                        error=str(exc),
+                    )
                     summary["skipped"].append(f"{item}: document conversion failed ({exc})")
             elif suffix == ".txt":
+                stage_start = _begin_stage("normalize_text", str(archived_path))
                 markdown_path = self._normalize_text_source(archived_path, sources_dir)
+                _finish_stage("normalize_text", stage_start, detail=str(archived_path))
                 summary["markdown"].append(str(markdown_path))
             else:
                 summary["notes"].append(f"{item}: archived only, no automatic conversion")
 
+        stage_start = _begin_stage("sync_formulas", str(project_dir))
         formula_summary = self._sync_formula_assets(project_dir)
+        _finish_stage("sync_formulas", stage_start, detail=str(project_dir))
         if formula_summary.get("total"):
             summary["notes"].append(
                 "Formula sync: "
@@ -864,13 +976,17 @@ class ProjectManager:
         # its images propagated to images/.  The primary propagation happens
         # inline during each source type's import path, but edge cases
         # (MinerU timing, naming mismatches) can leave images behind.
+        stage_start = _begin_stage("propagate_companion_images", str(sources_dir))
         self._ensure_all_companion_images_propagated(sources_dir, project_dir)
+        _finish_stage("propagate_companion_images", stage_start, detail=str(sources_dir))
 
         # Stabilize image assets: add short aliases and dimension table
         canvas_format = self._detect_canvas_format(project_dir)
+        stage_start = _begin_stage("stabilize_image_assets", str(project_dir / "images"))
         stabilize_result = stabilize_image_assets(
             str(project_dir), canvas_key=canvas_format,
         )
+        _finish_stage("stabilize_image_assets", stage_start, detail=str(project_dir / "images"))
         asset_count = stabilize_result.get("count", 0)
         formula_count = stabilize_result.get("formula_count", 0)
         if asset_count:
@@ -879,6 +995,8 @@ class ProjectManager:
                 f"including {formula_count} formula SVG(s); aliases + size table written."
             )
 
+        summary["notes"].append("Import report: notes/import_sources_report.json")
+        _write_import_report()
         return summary
 
     def _extract_asset_tags(self, *parts: str) -> list[str]:

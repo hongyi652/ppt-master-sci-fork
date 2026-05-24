@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import importlib
+from importlib import metadata as importlib_metadata
 import json
 import os
 import shutil
@@ -42,7 +43,7 @@ MIN_PYTHON = (3, 10)
 
 # Required and optional pip packages
 REQUIRED_PACKAGES = [
-    ("python-pptx", "python_pptx"),
+    ("python-pptx", "pptx"),
     ("Pillow", "PIL"),
     ("requests", "requests"),
 ]
@@ -115,7 +116,11 @@ def _check_required_packages() -> list[tuple[bool, str]]:
     for pip_name, import_name in REQUIRED_PACKAGES:
         try:
             importlib.import_module(import_name)
-            results.append((True, f"{pip_name} — installed"))
+            try:
+                version = importlib_metadata.version(pip_name)
+                results.append((True, f"{pip_name} {version} — installed"))
+            except importlib_metadata.PackageNotFoundError:
+                results.append((True, f"{pip_name} — installed"))
         except ImportError:
             results.append((False, f"{pip_name} — MISSING (pip install {pip_name})"))
     return results
@@ -185,13 +190,16 @@ def _check_source_files(project_dir: Path) -> list[tuple[bool, str]]:
     return results
 
 
-def _check_output_dirs(project_dir: Path) -> list[tuple[bool, str]]:
+def _check_output_dirs(project_dir: Path, *, fix: bool = False) -> list[tuple[bool, str]]:
     results: list[tuple[bool, str]] = []
     for dirname in ("svg_output", "svg_final", "images", "notes", "exports"):
         dir_path = project_dir / dirname
         if not dir_path.exists():
-            dir_path.mkdir(parents=True, exist_ok=True)
-            results.append((True, f"{dirname}/ — created"))
+            if fix:
+                dir_path.mkdir(parents=True, exist_ok=True)
+                results.append((True, f"{dirname}/ — created"))
+            else:
+                results.append((False, f"{dirname}/ — missing (run with --fix to create)"))
             continue
         # Verify writable
         try:
@@ -238,6 +246,7 @@ def run_preflight(
     project_path: str,
     *,
     preview_port: int = DEFAULT_PREVIEW_PORT,
+    fix: bool = False,
 ) -> dict[str, object]:
     """Run all preflight checks and return a structured report."""
     project_dir = Path(project_path).resolve()
@@ -292,7 +301,7 @@ def run_preflight(
     if project_dir.is_dir():
         for ok, msg in _check_source_files(project_dir):
             _record("sources", ok, msg)
-        for ok, msg in _check_output_dirs(project_dir):
+        for ok, msg in _check_output_dirs(project_dir, fix=fix):
             _record("output", ok, msg)
     else:
         _record("project", False, f"Project directory not found: {project_dir}")
@@ -362,6 +371,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--strict", action="store_true",
         help="Exit with code 1 if any check fails.",
     )
+    parser.add_argument(
+        "--fix", action="store_true",
+        help="Create missing project output directories before checking writability.",
+    )
     return parser
 
 
@@ -370,7 +383,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    report = run_preflight(args.project, preview_port=args.preview_port)
+    report = run_preflight(args.project, preview_port=args.preview_port, fix=args.fix)
     print_report(report)
 
     if args.json:

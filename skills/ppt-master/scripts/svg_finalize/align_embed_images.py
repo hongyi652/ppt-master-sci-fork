@@ -49,6 +49,7 @@ import io
 import os
 import re
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import unquote
@@ -75,6 +76,23 @@ _PIL_FORMAT_BY_MIME = {
     'image/webp': 'WEBP',
 }
 _OFFICE_VECTOR_EXTENSIONS = {'.emf', '.wmf'}
+_SVG_IMAGE_EXTENSIONS = {'.svg'}
+
+
+@dataclass
+class ImageProcessSummary:
+    """Structured result for one SVG image pass."""
+
+    processed: int = 0
+    skipped: int = 0
+    warnings: int = 0
+    errors: int = 0
+    messages: list[str] = field(default_factory=list)
+
+    def __iter__(self):
+        """Backward-compatible tuple unpacking as ``processed, errors``."""
+        yield self.processed
+        yield self.errors
 
 
 def _parse_float(val: str | None, default: float = 0.0) -> float:
@@ -95,6 +113,12 @@ def _format_number(n: float) -> str:
     return s or '0'
 
 
+def _is_external_href(href: str) -> bool:
+    """Return whether an href points outside the local filesystem."""
+    decoded = unquote(href or '')
+    return decoded.startswith(('http://', 'https://', 'file://'))
+
+
 def _resolve_image_path(href: str, svg_dir: Path) -> Path | None:
     """Resolve an <image> href to a local filesystem path.
 
@@ -104,7 +128,7 @@ def _resolve_image_path(href: str, svg_dir: Path) -> Path | None:
     if not href:
         return None
     decoded = unquote(href)
-    if decoded.startswith(('http://', 'https://', 'file://')):
+    if _is_external_href(decoded):
         return None
     if os.path.isabs(decoded):
         candidate = Path(decoded)
@@ -195,6 +219,13 @@ def _encode_pil_to_data_uri(
     return f'data:{mime_type};base64,{b64}', len(chosen)
 
 
+def _encode_raw_to_data_uri(src_path: Path, raw_bytes: bytes) -> str:
+    """Serialize raw image bytes without bitmap decoding."""
+    mime_type = get_mime_type(src_path.name, raw_bytes)
+    b64 = base64.b64encode(raw_bytes).decode('ascii')
+    return f'data:{mime_type};base64,{b64}'
+
+
 def _iter_image_elements(root: ET.Element):
     """Yield every <image> in the tree regardless of namespace prefix."""
     for image in root.iter(f'{{{SVG_NS}}}image'):
@@ -224,37 +255,45 @@ def _process_one_image(
     compress: bool,
     max_dimension: int | None,
     verbose: bool,
-) -> tuple[bool, str | None]:
+) -> tuple[str, str | None]:
     """Align (slice/meet) and embed a single <image>.
 
-    Returns ``(processed, error)`` where *processed* is True iff the image
-    was rewritten and *error* is a short message when something went wrong
-    (the image is left untouched in that case).
+    Returns ``(status, message)``. Status is one of ``processed``,
+    ``skipped``, ``warning``, or ``error``.
     """
     href = _get_href(image)
     if not href:
-        return False, None
+        return 'skipped', None
     if href.startswith('data:'):
-        return False, None  # already inline
+        return 'skipped', None  # already inline
+
+    if _is_external_href(href):
+        return 'skipped', f'external href skipped: {href[:60]}'
 
     img_path = _resolve_image_path(href, svg_dir)
     if img_path is None:
-        return False, f'unresolved href: {href[:60]}'
+        return 'error', f'unresolved href: {href[:60]}'
 
     try:
         with open(img_path, 'rb') as fh:
             raw_bytes = fh.read()
     except OSError as exc:
-        return False, f'read failed: {exc}'
+        return 'error', f'read failed: {exc}'
 
     if img_path.suffix.lower() in _OFFICE_VECTOR_EXTENSIONS:
         if verbose:
             print(f'   [INFO] {img_path.name}: Office vector left external for native PPTX passthrough')
-        return False, None
+        return 'skipped', 'Office vector left external for native PPTX passthrough'
+
+    if img_path.suffix.lower() in _SVG_IMAGE_EXTENSIONS:
+        _set_href(image, _encode_raw_to_data_uri(img_path, raw_bytes))
+        if verbose:
+            print(f'   [OK] {img_path.name} (SVG embedded)')
+        return 'processed', None
 
     img = _load_pil_image(img_path)
     if img is None:
-        return False, 'PIL open failed'
+        return 'error', 'PIL open failed'
 
     box_x = _parse_float(image.get('x'))
     box_y = _parse_float(image.get('y'))
@@ -310,7 +349,7 @@ def _process_one_image(
         fallback_bytes=raw_bytes if not transformed else None,
     )
     if encoded is None:
-        return False, 'encode failed'
+        return 'error', 'encode failed'
     data_uri, _ = encoded
 
     _set_href(image, data_uri)
@@ -324,7 +363,7 @@ def _process_one_image(
     if verbose:
         suffix = ' (cropped)' if transformed else ''
         print(f'   [OK] {img_path.name}{suffix}')
-    return True, None
+    return 'processed', None
 
 
 def count_office_vector_refs_in_svg(svg_path: str | Path) -> int:
@@ -358,10 +397,10 @@ def align_and_embed_images_in_svg(
     verbose: bool = False,
     compress: bool = False,
     max_dimension: int | None = None,
-) -> tuple[int, int]:
+) -> ImageProcessSummary:
     """Run the merged align + embed pass on a single SVG file.
 
-    Returns ``(processed_count, error_count)``.
+    Returns a structured image processing summary.
     """
     svg_path = Path(svg_path)
     svg_dir = svg_path.parent.resolve()
@@ -375,14 +414,13 @@ def align_and_embed_images_in_svg(
     except ET.ParseError as exc:
         if verbose:
             print(f'  [ERROR] {svg_path.name}: parse failed ({exc})')
-        return (0, 1)
+        return ImageProcessSummary(errors=1, messages=[f'parse failed: {exc}'])
     root = tree.getroot()
 
     # Avoid double-iteration if an element matches both namespaced and
     # bare-tag iteration paths.
     seen: set[int] = set()
-    processed = 0
-    errors = 0
+    summary = ImageProcessSummary()
 
     for image in _iter_image_elements(root):
         ident = id(image)
@@ -391,24 +429,32 @@ def align_and_embed_images_in_svg(
         seen.add(ident)
 
         if dry_run:
-            processed += 1
+            summary.processed += 1
             continue
 
-        ok, err = _process_one_image(
+        status, message = _process_one_image(
             image, svg_dir,
             compress=compress, max_dimension=max_dimension, verbose=verbose,
         )
-        if ok:
-            processed += 1
-        elif err:
-            errors += 1
-            if verbose:
-                print(f'   [WARN] {svg_path.name}: {err}')
+        if status == 'processed':
+            summary.processed += 1
+        elif status == 'warning':
+            summary.warnings += 1
+        elif status == 'error':
+            summary.errors += 1
+        else:
+            summary.skipped += 1
 
-    if processed > 0 and not dry_run:
+        if message:
+            summary.messages.append(message)
+            if verbose and status in {'warning', 'error'}:
+                label = '[WARN]' if status == 'warning' else '[ERROR]'
+                print(f'   {label} {svg_path.name}: {message}')
+
+    if summary.processed > 0 and not dry_run:
         tree.write(svg_path, encoding='utf-8', xml_declaration=False)
 
-    return (processed, errors)
+    return summary
 
 
 # ---------------------------------------------------------------------------
@@ -433,14 +479,20 @@ def _cli() -> None:
         print(f'Error: file not found: {args.svg}', file=sys.stderr)
         sys.exit(1)
 
-    proc, err = align_and_embed_images_in_svg(
+    summary = align_and_embed_images_in_svg(
         args.svg,
         dry_run=args.dry_run,
         verbose=args.verbose,
         compress=args.compress,
         max_dimension=args.max_dimension,
     )
-    print(f'Processed {proc} image(s), {err} error(s)')
+    print(
+        f'Processed {summary.processed} image(s), '
+        f'skipped {summary.skipped}, warnings {summary.warnings}, '
+        f'errors {summary.errors}'
+    )
+    if summary.errors:
+        sys.exit(1)
 
 
 if __name__ == '__main__':

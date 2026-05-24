@@ -117,6 +117,7 @@ def finalize_project(
     compress: bool = False,
     max_dimension: int | None = None,
     verbose: bool = False,
+    allow_image_errors: bool = False,
 ) -> bool:
     """
     Finalize SVG files in the project
@@ -128,6 +129,7 @@ def finalize_project(
         quiet: Quiet mode, reduce output
         compress: Compress images before embedding
         max_dimension: Downscale images exceeding this dimension
+        allow_image_errors: Keep legacy success behavior for image errors
     """
     svg_output = project_dir / 'svg_output'
     svg_final = project_dir / 'svg_final'
@@ -185,24 +187,32 @@ def finalize_project(
         if not quiet:
             safe_print("[2/4] Aligning + embedding images...")
         img_count = 0
+        img_skipped = 0
+        img_warnings = 0
         img_errors = 0
         office_vector_count = 0
         for svg_file in svg_final.glob('*.svg'):
             office_vector_count += count_office_vector_refs_in_svg(svg_file)
-            count, errs = align_and_embed_images_in_svg(
+            image_summary = align_and_embed_images_in_svg(
                 svg_file,
                 dry_run=False,
                 verbose=verbose,
                 compress=compress,
                 max_dimension=max_dimension,
             )
-            img_count += count
-            img_errors += errs
+            img_count += image_summary.processed
+            img_skipped += image_summary.skipped
+            img_warnings += image_summary.warnings
+            img_errors += image_summary.errors
         if not quiet:
-            if img_count > 0:
+            if img_count > 0 or img_skipped or img_warnings or img_errors:
                 msg = f"      {img_count} image(s) aligned + embedded"
+                if img_skipped:
+                    msg += f", {img_skipped} skipped"
+                if img_warnings:
+                    msg += f", {img_warnings} warning(s)"
                 if img_errors:
-                    msg += f"  ({img_errors} error(s))"
+                    msg += f", {img_errors} error(s)"
                 safe_print(msg)
                 if office_vector_count:
                     safe_print(
@@ -216,6 +226,14 @@ def finalize_project(
                 )
             else:
                 safe_print("      No images")
+
+        if img_errors and not allow_image_errors:
+            if not quiet:
+                safe_print(
+                    f"[ERROR] Image post-processing found {img_errors} true error(s). "
+                    "Use --allow-image-errors only for legacy compatibility."
+                )
+            return False
 
     # Step 4: Flatten text
     if options.get('flatten_text'):
@@ -302,6 +320,8 @@ Aliases (still accepted):
                         help='Compress images before embedding (JPEG quality=85, PNG optimize)')
     parser.add_argument('--max-dimension', type=int, default=None,
                         help='Downscale images exceeding this dimension on either axis (e.g., 2560)')
+    parser.add_argument('--allow-image-errors', action='store_true',
+                        help='Return success even when image post-processing reports true errors')
 
     args = parser.parse_args()
 
@@ -334,7 +354,8 @@ Aliases (still accepted):
     success = finalize_project(args.project_dir, options, args.dry_run, args.quiet,
                                compress=args.compress,
                                max_dimension=args.max_dimension,
-                               verbose=args.verbose)
+                               verbose=args.verbose,
+                               allow_image_errors=args.allow_image_errors)
     sys.exit(0 if success else 1)
 
 
