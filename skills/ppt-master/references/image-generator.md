@@ -195,7 +195,7 @@ Exception: when the chosen rendering is `corporate-photo`, photorealism is inten
 
 | `spec_lock typography.font_family` contains | Prompt descriptor for AI image text |
 |---|---|
-| `KaiTi` / `FangSong` / `Georgia` / serif families | "elegant serif lettering, refined letterforms" |
+| `KaiTi` / `FangSong` / `Georgia` / serif families | \"elegant serif lettering, refined letterforms\" (note: KaiTi is BANNED for SVG text but may still appear in legacy spec_lock; use FangSong or SimSun instead) |
 | `Microsoft YaHei` / `PingFang SC` / `Arial` / sans-serif families | "clean geometric sans-serif, modern letterforms" |
 | `SimHei` / `Impact` / `Arial Black` / display families | "bold display lettering, heavy expressive strokes" |
 | `Consolas` / `Courier New` / monospace families | "monospace technical lettering, fixed-width" |

@@ -168,13 +168,123 @@ One offending character invalidates the file and aborts export. Numeric refs (`&
 ## 4. Basic SVG Rules
 
 - **viewBox** must match the canvas dimensions (`width`/`height` must match `viewBox`)
-- **Background**: Use `<rect>` to define the page background color
+- **Background**: Use `<rect>` to define the page background color. **Default is light (white `#FFFFFF` or near-white) unless the user explicitly requested a dark background and this is recorded in `spec_lock.md`**
 - **`<tspan>`** has two purposes: (1) manual line breaks (use `dy` or explicit `y`); (2) inline run formatting on the same line (color/weight/size). `<foreignObject>` is FORBIDDEN. See "Single logical line" rule below.
-- **Fonts**: every `font-family` stack MUST end with a pre-installed family (Microsoft YaHei / SimSun / Arial / Times New Roman / Consolas …); `@font-face` is FORBIDDEN. Full rule: [`strategist.md §g`](strategist.md).
+- **Fonts**: every `font-family` stack MUST end with a pre-installed family (Microsoft YaHei / SimSun / Arial / Times New Roman / Consolas …); `@font-face` is FORBIDDEN. **⛔ 楷体 (`KaiTi`) is BANNED** — do not use in any font stack. **CJK-first metric rule**: when the primary font is CJK, put it FIRST — the converter uses it for both `<a:latin>` and `<a:ea>` slots to prevent size/alignment mismatch between Latin and CJK characters in mixed text. Full rule: [`strategist.md §g`](strategist.md).
 - **Styles**: inline only (`fill=""`, `font-size=""`); `<style>`/`class` FORBIDDEN (`id` inside `<defs>` is fine)
 - **Colors**: HEX only; transparency via `fill-opacity`/`stroke-opacity`
 - **Images**: `<image href="../images/xxx.png" preserveAspectRatio="xMidYMid meet"/>` by default; use `slice` only for rows marked `Display mode: crop-ok`.
+- **Formula SVGs — NO PLAIN-TEXT FORMULAS**: see §4.1 below. Any mathematical notation in `<text>` is a **blocking error**.
 - **Icons**: `<use data-icon="<library>/<name>" x="" y="" width="48" height="48" fill="#HEX"/>` (auto-embedded post-processing). Always include library prefix. One stylistic library per deck (`chunk-filled`/`tabler-filled`/`tabler-outline`/`phosphor-duotone`); `simple-icons` only for real brand marks. See [`../templates/icons/README.md`](../templates/icons/README.md).
+
+### 4.1 Iron Rule — No Plain-Text Formulas or Mathematical Notation
+
+> **IRON RULE**: Mathematical expressions MUST NOT appear as raw plain-text approximations (e.g. `a_1`, `x^2`, `a/b`, `√x`) inside `<text>` / `<tspan>`. The converter supports **two rendering paths** — choose by complexity:
+>
+> | Tier | When to use | Rendering path |
+> |------|-------------|----------------|
+> | **Tier A — Native sub/superscript** | Single-level subscript OR superscript on 1–3 characters (chemical formulas, simple variable names, unit exponents) | `<tspan baseline-shift="sub/super" font-size="70%">` inside the parent `<text>` |
+> | **Tier B — Formula SVG image** | Fractions, radicals, integrals, multi-level nesting, full equations, anything beyond a simple sub/super | `latex_to_svg.py` → `<image href="../images/formula_*.svg">` |
+>
+> Writing a formula-like pattern as bare text (no `baseline-shift`, no `<image>`) is a **blocking error**.
+
+#### Tier A — Native Sub/Superscript via `baseline-shift`
+
+`svg_to_pptx.py` maps `baseline-shift="sub"` → DrawingML `baseline="-25000"` and `baseline-shift="super"` → DrawingML `baseline="30000"`, producing native PowerPoint subscripts/superscripts that are editable, font-consistent, and properly positioned.
+
+**Use Tier A when ALL of the following are true**:
+
+1. Only a single level of subscript OR superscript (not both simultaneously on the same base)
+2. The sub/superscript content is 1–3 characters (digits, single letters, `+`, `-`)
+3. No fraction bar, radical, integral, sum, or other structural math operator is involved
+
+**Tier A examples** (use `baseline-shift`):
+
+| Expression | SVG markup |
+|---|---|
+| H₂O | `H<tspan baseline-shift="sub" font-size="70%">2</tspan>O` |
+| CO₂ | `CO<tspan baseline-shift="sub" font-size="70%">2</tspan>` |
+| Fe³⁺ | `Fe<tspan baseline-shift="super" font-size="70%">3+</tspan>` |
+| 10⁻⁹ s | `10<tspan baseline-shift="super" font-size="70%">-9</tspan> s` |
+| Tₑ | `T<tspan baseline-shift="sub" font-size="70%">e</tspan>` |
+| nₑ | `n<tspan baseline-shift="sub" font-size="70%">e</tspan>` |
+| m² | `m<tspan baseline-shift="super" font-size="70%">2</tspan>` |
+| cm⁻³ | `cm<tspan baseline-shift="super" font-size="70%">-3</tspan>` |
+
+**Recommended template** — inline subscript in a sentence:
+
+```xml
+<text x="100" y="300" font-size="20" fill="#333333">
+  电子密度 n<tspan baseline-shift="sub" font-size="70%">e</tspan> 的典型值为 10<tspan baseline-shift="super" font-size="70%">19</tspan> m<tspan baseline-shift="super" font-size="70%">-3</tspan>
+</text>
+```
+
+**Tier A constraints**:
+
+- `font-size="70%"` (or 65%–75%) is mandatory — without it, the shifted text stays at full size and looks wrong.
+- Inline tspans with `baseline-shift` must NOT carry `x`/`y`/`dy` — they are inline runs, not line breaks.
+- Do NOT nest `baseline-shift` (no sub-of-sub or super-of-sub) — use Tier B for such cases.
+- Unicode sub/superscript characters (`²`, `³`, `₂`, `ₑ`, etc.) are allowed as a shorthand for Tier A when coverage permits, but `baseline-shift` is preferred for consistency and full character coverage.
+
+#### Tier B — Formula SVG Image via `latex_to_svg.py`
+
+**Use Tier B for anything beyond simple single-level sub/superscripts**:
+
+| Category | Examples | Why not Tier A |
+|---|---|---|
+| **Fractions** | a/b, ΔT/Δt, dN/dt | Requires `\frac{}{}` vertical stacking |
+| **Square roots / radicals** | √x, √(2πkT/m) | No SVG text equivalent |
+| **Summation / product / integral** | ∑_{i=1}^{n}, ∫_0^∞ | Multi-level + operator |
+| **Mixed sub + superscripts on same base** | x_i^2, T_e^{3/2} | Two levels simultaneously |
+| **Full equations** | E=mc², ρ_L = v_⊥/ω_c, PV=nRT | Multiple terms with operators |
+| **Limit / log / trig with notation** | lim_{x→0}, sin²θ | Structural notation |
+| **Set / logic notation** | x ∈ ℝ, A ∩ B | Specialized operators |
+| **Vector / matrix notation** | →v, ‖x‖, A⁻¹ | Structural decoration |
+| **Complex chemical reactions** | 2H₂ + O₂ → 2H₂O | Multi-term equation |
+| **Multi-term expressions** | α + β = γ, Φ(x) = ... | Equation structure |
+
+**Tier B procedure** (per page, before writing SVG):
+
+```
+FOR each text string planned for this page:
+    1. Does it contain a fraction, radical, integral, sum, multi-level sub/super, or equation?
+       → YES: Tier B — proceed to step 2
+    2. CONVERT to SVG image:
+       a. Check formula_manifest.json / image_asset_table.md for existing formula_*.svg
+       b. If found → embed: <image href="../images/formula_XXX.svg" .../>
+       c. If NOT found → generate on-the-fly:
+          python3 ${SKILL_DIR}/scripts/latex_to_svg.py "<latex>" -o <project>/images/formula_inline_<NNN>.svg
+          (counter <NNN> from 901, incrementing)
+       d. Embed the generated SVG as <image>
+    3. NEVER fall back to plain text. If latex_to_svg.py fails, surface the error and stop.
+```
+
+#### Absolutely Forbidden Patterns (Blocking Error)
+
+These patterns in `<text>` / `<tspan>` without either `baseline-shift` or `<image>` conversion are **blocking errors**:
+
+| Pattern | What's wrong | Fix |
+|---|---|---|
+| `a_1`, `T_e`, `x_n` | Raw underscore notation | Tier A `baseline-shift="sub"` or Tier B `<image>` |
+| `a^2`, `x^n`, `10^3` | Raw caret notation | Tier A `baseline-shift="super"` or Tier B `<image>` |
+| `a/b` between variables | Raw fraction | Tier B `<image>` with `\frac{}{}` |
+| `√x`, `√(...)` | Raw radical symbol | Tier B `<image>` with `\sqrt{}` |
+| `∑_{...}`, `∫_{...}` | Raw operator with limits | Tier B `<image>` |
+| `E = mc²` as flat text | Equation without proper rendering | Tier B `<image>` (or Tier A if only the `²` needs shifting) |
+
+#### Boundary — What is NOT a Formula
+
+These are plain text and do NOT require conversion:
+
+- **Standalone Greek letters as labels** (not in equations): "α相", "β版本", "Δ变化量"
+- **Simple percentages and multipliers**: "35%", "10×", "3.14"
+- **Chemical element symbols without subscripts**: "Fe", "Pb", "U"
+- **Programming code snippets**: `x_1` in a code block on a tech slide
+- **Plain acronyms without subscript intent**: "CO2" as informal label (but scientific context → Tier A `CO<tspan baseline-shift="sub" font-size="70%">2</tspan>`)
+
+#### Quality Gate
+
+`svg_quality_checker.py` detects raw plain-text formula patterns (underscore notation, caret notation, Unicode sub/superscripts without `baseline-shift`, etc.) in `<text>` / `<tspan>` content and reports them as **errors** (not warnings). Properly marked `<tspan baseline-shift="sub/super">` elements are NOT flagged.
 
 ### Inline Text Runs (Single Logical Line = Single `<text>`)
 

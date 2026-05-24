@@ -282,6 +282,11 @@ class SVGQualityChecker:
                 if not self.template_mode:
                     self._check_sourced_image_attribution(content, svg_path, result)
 
+                # 10. Check plain-text formula violations (Iron Rule §4.1).
+                #     Templates may contain placeholder math text; skip.
+                if not self.template_mode:
+                    self._check_plain_text_formulas(content, result)
+
             # Determine pass/fail
             result['passed'] = len(result['errors']) == 0
 
@@ -467,8 +472,9 @@ class SVGQualityChecker:
         # Pre-installed on Windows + macOS out of the box (plus their direct
         # FONT_FALLBACK_WIN mappings). A stack whose last concrete family is in
         # this set survives the PPTX round-trip on any viewer machine.
+        # KaiTi is explicitly BANNED (Iron Rule) — not in ppt_safe_tail.
         ppt_safe_tail = {
-            'microsoft yahei', 'simhei', 'simsun', 'kaiti', 'fangsong',
+            'microsoft yahei', 'simhei', 'simsun', 'fangsong',
             'pingfang sc', 'heiti sc', 'songti sc', 'stsong',
             'arial', 'arial black', 'calibri', 'segoe ui', 'verdana',
             'helvetica', 'helvetica neue', 'tahoma', 'trebuchet ms',
@@ -476,6 +482,9 @@ class SVGQualityChecker:
             'consolas', 'courier new', 'menlo', 'monaco',
             'impact',
         }
+
+        # Banned fonts — using any of these is an error, not a warning.
+        banned_fonts = {'kaiti', '楷体'}
 
         for font_family in font_matches:
             # Drop the generic CSS fallback (sans-serif / serif / monospace)
@@ -487,6 +496,14 @@ class SVGQualityChecker:
                                         'cursive', 'fantasy', 'system-ui')]
             if not parts:
                 continue
+
+            # Check for banned fonts anywhere in the stack
+            for p in parts:
+                if p in banned_fonts:
+                    result['errors'].append(
+                        f"Banned font '{p}' detected in stack: {font_family} "
+                        f"— KaiTi (楷体) is forbidden (Iron Rule)")
+
             tail = parts[-1]
             if tail not in ppt_safe_tail:
                 result['warnings'].append(
@@ -819,6 +836,123 @@ class SVGQualityChecker:
             v = v[:-2].strip()
         return v
 
+    # ------------------------------------------------------------------
+    # Plain-text formula detection (Iron Rule §4.1)
+    # ------------------------------------------------------------------
+
+    # Patterns that indicate mathematical notation inside <text>/<tspan>.
+    # Each tuple: (compiled regex, human-readable description).
+    # Patterns are intentionally conservative — they target unambiguous
+    # formula syntax, not every possible Unicode math character.
+    _FORMULA_PATTERNS: List[Tuple[re.Pattern, str]] = [
+        # Subscript notation:  a_1  T_e  ρ_L  x_{n+1}  H_2O
+        (re.compile(r'[A-Za-z\u0370-\u03FF\u0400-\u04FF]_[\{\[A-Za-z0-9⊥∥]'),
+         "subscript notation (e.g. T_e, H_2O, x_{n+1})"),
+        # Superscript notation:  a^2  x^n  e^{-x}  cm^{-3}
+        (re.compile(r'[A-Za-z0-9\u0370-\u03FF\)]\^[\{\[A-Za-z0-9\-+]'),
+         "superscript notation (e.g. x^2, e^{-x}, cm^{-3})"),
+        # Unicode superscript digits (except standalone ² ³ in prose like "第2次"):
+        # require a preceding letter  →  m², s⁻¹, cm⁻³
+        (re.compile(r'[A-Za-z\u0370-\u03FF][²³⁴⁵⁶⁷⁸⁹⁰⁻⁺]'),
+         "Unicode superscript after letter (e.g. m², s⁻¹)"),
+        # Unicode subscript digits after a letter: H₂O, CO₂
+        (re.compile(r'[A-Za-z\u0370-\u03FF][₀₁₂₃₄₅₆₇₈₉ₙᵢ]'),
+         "Unicode subscript after letter (e.g. H₂O, CO₂)"),
+        # Summation / product / integral with limits:  ∑_{  ∏_{  ∫_  ∫_0^∞
+        (re.compile(r'[∑∏∫][_^]'),
+         "summation/product/integral with limits (e.g. ∑_{i=1}^{n})"),
+        # Square root symbol: √
+        (re.compile(r'[√∛∜]'),
+         "radical symbol (√, ∛, ∜)"),
+        # Fraction between variable-like tokens: v_⊥/ω_c, ΔT/Δt, dN/dt
+        # but NOT "and/or", filesystem paths, or dates
+        (re.compile(
+            r'(?<![/\w])(?:[A-Z][a-z]?|[a-z]|[Δδ∂])[A-Za-z0-9_]*'
+            r'/'
+            r'(?:[A-Z][a-z]?|[a-z]|[Δδ∂])[A-Za-z0-9_]*(?![/\w])'
+        ), "fraction between variables (e.g. a/b, ΔT/Δt, dN/dt)"),
+        # Equals-sign equations with variables on both sides:
+        # E = mc², F = ma, PV = nRT  (but not simple "x = 5" or attribute assignments)
+        (re.compile(
+            r'(?<!["\'])(?:[A-Za-z\u0370-\u03FF][A-Za-z0-9_]*)\s*=\s*'
+            r'(?:[A-Za-z\u0370-\u03FF][A-Za-z0-9_]*[\s*/+\-·×]'
+            r'[A-Za-z\u0370-\u03FF0-9_²³⁻⁺]+)'
+        ), "equation with variables (e.g. E=mc², PV=nRT)"),
+    ]
+
+    def _check_plain_text_formulas(self, content: str, result: Dict):
+        """Detect mathematical notation written as <text>/<tspan> content.
+
+        Iron Rule §4.1 of shared-standards.md: formula-like text must use
+        either Tier A (baseline-shift on tspan) or Tier B (<image>).
+        Raw plain-text formulas without baseline-shift are errors.
+        """
+        try:
+            root = ET.fromstring(content)
+        except ET.ParseError:
+            return  # XML check already reported the failure
+
+        violations: List[str] = []
+
+        # Collect all text content from <text> elements.
+        seen_elems = set()
+        for elem in root.iter():
+            local = elem.tag.split('}')[-1] if '}' in str(elem.tag) else str(elem.tag)
+            if local == 'text' and id(elem) not in seen_elems:
+                seen_elems.add(id(elem))
+                self._scan_element_for_formulas(elem, violations)
+
+        # Deduplicate
+        seen = set()
+        for v in violations:
+            if v not in seen:
+                seen.add(v)
+                result['errors'].append(v)
+
+    @staticmethod
+    def _has_baseline_shift(elem) -> bool:
+        """Check if element has baseline-shift attribute (Tier A rendering)."""
+        bs = elem.get('baseline-shift')
+        if bs:
+            return True
+        style = elem.get('style', '')
+        return 'baseline-shift' in style
+
+    def _scan_element_for_formulas(self, elem, violations: List[str]):
+        """Recursively scan a <text> element's text/tail for formula patterns.
+
+        Skips tspan elements that have baseline-shift set (Tier A — native
+        sub/superscript), since those are properly handled by the converter.
+        """
+        for node in elem.iter():
+            # Skip tspan nodes with baseline-shift — they use Tier A rendering
+            local_tag = node.tag.split('}')[-1] if '}' in str(node.tag) else str(node.tag)
+            if local_tag == 'tspan' and self._has_baseline_shift(node):
+                # Still check tail text (text after the closing </tspan> tag
+                # belongs to the parent, not this tspan)
+                tail = (node.tail or '').strip()
+                if tail:
+                    self._check_fragment_for_formulas(tail, violations)
+                continue
+
+            for text_fragment in (node.text, node.tail):
+                if not text_fragment or not text_fragment.strip():
+                    continue
+                self._check_fragment_for_formulas(text_fragment.strip(), violations)
+
+    def _check_fragment_for_formulas(self, fragment: str, violations: List[str]):
+        """Check a single text fragment against formula patterns."""
+        for pattern, description in self._FORMULA_PATTERNS:
+            match = pattern.search(fragment)
+            if match:
+                snippet = fragment[:80] + ('…' if len(fragment) > 80 else '')
+                violations.append(
+                    f"Plain-text formula detected ({description}): "
+                    f"\"{snippet}\" — use baseline-shift (Tier A) or "
+                    f"latex_to_svg.py (Tier B) per Iron Rule §4.1"
+                )
+                break  # one violation per fragment is enough
+
     def _categorize_issue(self, error_msg: str) -> str:
         """Categorize issue type"""
         if 'Invalid XML' in error_msg:
@@ -827,6 +961,8 @@ class SVGQualityChecker:
             return 'viewBox issues'
         elif 'foreignObject' in error_msg:
             return 'foreignObject'
+        elif 'Plain-text formula' in error_msg:
+            return 'Plain-text formula (Iron Rule §4.1)'
         elif 'font' in error_msg.lower():
             return 'Font issues'
         else:

@@ -38,9 +38,9 @@ Provide specific page count recommendation based on source document content volu
 
 Confirm target audience, usage occasion, core message, and **deck text language**; provide initial assessment based on document nature.
 
-> **Language is mandatory**: before deck generation, explicitly confirm which language the PPT copy should use (for example: `zh-CN`, `en-US`, bilingual Chinese-first). Do not infer solely from chat language when the user has not stated it. Record it in `design_spec.md §I Project Information` and `spec_lock.md` as the execution truth.
+> **Language is mandatory — ASK FIRST**: before presenting the rest of the Eight Confirmations bundle, Strategist MUST proactively ask the user: "PPT 正文使用什么语言？" (or the equivalent in the conversation language). This is the very first question; do not skip it, do not infer solely from chat language. Record the confirmed language in `design_spec.md §I Project Information` and `spec_lock.md` as the execution truth.
 
-**Default recommendation**: when the user has not named a deck language, recommend `zh-CN` as the default option in the confirmation bundle. Record another language only when the user explicitly chooses it or the source task clearly requires it.
+**Default recommendation**: when the user has not named a deck language, recommend `zh-CN` as the default option. Record another language only when the user explicitly chooses it or the source task clearly requires it.
 
 ### d. Style Objective Confirmation
 
@@ -88,9 +88,11 @@ Accept user combinations and one-off coinages ("Scandinavian + slight industrial
 
 > **Template vs descriptor**: a style mention may sound like a template name ("academic style" vs the `academic_defense/` template directory). Step 3 only triggers on an explicit template directory path supplied by the user — bare names and style words never copy templates. If a template was triggered upstream, its files are already in `<project_path>/templates/`. Layer 2 only handles descriptors that did NOT come with a template path.
 
-**Downstream effect**: e / f / g / h values realize the Layer 2 descriptor on top of the Layer 1 mode. Example: "A) Versatile + neo-Chinese" → e leans cinnabar / ink / rice-paper; g pairs serif (KaiTi-class) with sans body; f minimal line icons; h restrained traditional imagery with negative space.
+**Downstream effect**: e / f / g / h values realize the Layer 2 descriptor on top of the Layer 1 mode. Example: "A) Versatile + neo-Chinese" → e leans cinnabar / ink / rice-paper; g pairs serif (FangSong / SimSun) with sans body; f minimal line icons; h restrained traditional imagery with negative space.
 
 ### e. Color Scheme Recommendation
+
+**Hard rule — light background by default**: unless the user **explicitly** requests a dark background (e.g. "用深色背景" / "dark background" / "dark tech style with dark bg"), the page background MUST be light (white `#FFFFFF` or near-white). Choosing a "dark tech" or "cyberpunk" visual style alone does NOT trigger a dark background — the background stays light unless the user says otherwise. Record `background: light` or `background: dark` in `design_spec.md §II` and `spec_lock.md`.
 
 **Hard rule**: User / template colors are truth. If the user has specified colors (HEX, brand colors, or natural-language directives like "use blue as primary"), or a template was loaded at Step 3 via an explicit path (`<project_path>/templates/design_spec.md`), lock those directly and skip the recommendation table. Do not adjust them to fit any palette or industry default. Only when no color signal exists from user or template do you proactively propose a scheme below.
 
@@ -151,13 +153,21 @@ See [`../templates/icons/README.md`](../templates/icons/README.md) for the curre
 > Same-deck fonts must form **contrast** (different family, weight, or proportion) or **concord** (one family throughout). "Similar but not identical" pairings *across roles* are forbidden — see blacklist below. *Within one stack*, pairing a Windows font with a macOS counterpart (e.g. `Microsoft YaHei` + `PingFang SC`) is encouraged as a browser-preview nicety; converter writes only the first into PPTX.
 
 > **⚠️ PPT-safe font discipline (HARD rule).** PPTX has no runtime fallback — missing fonts substitute to Calibri. Every stack MUST end with a pre-installed font:
-> - CJK → `"Microsoft YaHei"` / `SimHei` / `SimSun` / `FangSong` / `KaiTi`
+> - CJK → `"Microsoft YaHei"` / `SimHei` / `SimSun` / `FangSong` (~~`KaiTi`~~ BANNED — see below)
 > - Latin sans → `Arial` / `Calibri` / `Segoe UI` / `Verdana` / `Trebuchet MS`
 > - Latin serif → `"Times New Roman"` / `Georgia` / `Cambria` / `Palatino` / `Garamond`
 > - Mono → `Consolas` / `"Courier New"`
 > - Display → `Impact` / `"Arial Black"`
 >
 > Stacks led by non-pre-installed fonts (Inter / HarmonyOS Sans / Source Han / brand typefaces like McKinsey Bower) are only acceptable when the Design Spec notes "requires install or PPTX embed".
+
+> **⚠️ CJK-first metric-consistency rule (HARD rule).** PowerPoint uses `<a:latin>` for Latin characters and `<a:ea>` for CJK characters **within the same run**. If these two slots hold different fonts (e.g. Segoe UI + Microsoft YaHei), characters in a mixed line ("效率提升35%") render at different visual sizes despite identical `sz`, because the two fonts have different ascender/descender/x-height metrics. This causes visible misalignment between lines with different Latin/CJK ratios.
+>
+> **Stack-ordering rule**: when the intended primary font is CJK, put it FIRST and do NOT add a separate Latin font before it. The converter will use the CJK font for both `<a:latin>` and `<a:ea>`, ensuring metric consistency. Only add a Latin font before the CJK font when you specifically want different Latin rendering (and accept the minor metric mismatch).
+>
+> ✅ **Consistent**: `"Microsoft YaHei", "PingFang SC", sans-serif` → both slots use YaHei
+> ✅ **Intentional split**: `"Arial", "Microsoft YaHei", sans-serif` → Arial for Latin, YaHei for CJK (user explicitly chose this)
+> ❌ **Accidental split**: `"Microsoft YaHei", "Arial", sans-serif` → YaHei for both (Arial is ignored because CJK came first — if you want Arial for Latin, put it before YaHei)
 
 **Forbidden — similar-but-not-identical pairings across roles** (do not split title vs body across these; within one stack as cross-platform fallback they remain encouraged):
 
@@ -176,7 +186,7 @@ See [`../templates/icons/README.md`](../templates/icons/README.md) for the curre
 | Category | Safe families |
 |----------|--------------|
 | CJK sans | Microsoft YaHei, SimHei, PingFang SC, Heiti SC |
-| CJK serif | SimSun, FangSong, KaiTi, Songti SC |
+| CJK serif | SimSun, FangSong, Songti SC (~~KaiTi~~ BANNED) |
 | Latin sans | Arial, Calibri, Segoe UI, Verdana, Trebuchet MS, Helvetica Neue |
 | Latin serif | Times New Roman, Georgia, Cambria, Palatino, Garamond, Book Antiqua |
 | Mono | Consolas, Courier New |
@@ -186,8 +196,8 @@ See [`../templates/icons/README.md`](../templates/icons/README.md) for the curre
 
 | Contrast axis | Title stack | Body stack | Code stack |
 |---|---|---|---|
-| Serif × sans | `Georgia, KaiTi, serif` | `"Microsoft YaHei", "PingFang SC", sans-serif` | — |
-| Kai × hei | `KaiTi, Georgia, serif` | `"Microsoft YaHei", "PingFang SC", sans-serif` | — |
+| Serif × sans | `Georgia, SimSun, serif` | `"Microsoft YaHei", "PingFang SC", sans-serif` | — |
+| ~~Kai × hei~~ | ~~`KaiTi, Georgia, serif`~~ | ~~removed — KaiTi BANNED~~ | — |
 | Fangsong × hei | `FangSong, "Times New Roman", serif` | `SimHei, "Microsoft YaHei", sans-serif` | — |
 | Double serif | `Palatino, FangSong, serif` | `Cambria, SimSun, serif` | — |
 | Same family, weight contrast (900 / 300) | `"Microsoft YaHei", "PingFang SC", sans-serif` | same | — |

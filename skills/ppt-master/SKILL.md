@@ -31,14 +31,23 @@ On this machine, run Python commands as `py -3.11` instead of `python3`, and set
 > 7. **SEQUENTIAL PAGE GENERATION ONLY** — In Executor Step 6, after the global design context is confirmed, SVG pages MUST be generated sequentially page by page in one continuous pass. Grouped page batches (for example, 5 pages at a time) are FORBIDDEN
 > 8. **SPEC_LOCK RE-READ PER PAGE** — Before generating each SVG page, Executor MUST `read_file <project_path>/spec_lock.md`. All colors / fonts / icons / images MUST come from this file — no values from memory or invented on the fly. Executor MUST also look up the current page's `page_rhythm` (`anchor` / `dense` / `breathing`), `page_layouts` (which template SVG to inherit, if any), and `page_charts` (which chart template to adapt, if any). Empty / absent entries are intentional Strategist signals — see executor-base.md §2.1. This rule exists to resist context-compression drift on long decks and to break the uniform "every page is a card grid" default
 > 9. **SVG MUST BE HAND-WRITTEN, NOT SCRIPT-GENERATED** — Every SVG page is written by the main agent directly, one page at a time (see rules 6 and 7). Writing or running a Python / Node / shell script that produces the SVG files in batch — looping over pages, templating from data, or emitting them via a generator — is FORBIDDEN, including under "save tokens", "quick draft", or "user is in a hurry" pretexts. The script-generation path was tried on a feature branch and abandoned: cross-page visual consistency depends on per-page authoring with full upstream context, which a generator script cannot reproduce
+> 10. **⛔ IRON RULE — NO PLAIN-TEXT FORMULAS** — Raw formula-like patterns (`a_1`, `x^2`, `a/b`, `√x`, bare `²`) in `<text>` / `<tspan>` without proper rendering are a **blocking error**. Two rendering tiers — full rules in [`shared-standards.md §4.1`](references/shared-standards.md):
+>    - **Tier A — simple sub/super** (single-level, 1–3 chars like H₂O, Tₑ, 10⁻⁹, m²): use `<tspan baseline-shift="sub" font-size="70%">` or `baseline-shift="super"`. The converter maps this to native DrawingML `baseline` — editable in PowerPoint.
+>    - **Tier B — complex formulas** (fractions, radicals, integrals, multi-level, full equations): call `latex_to_svg.py` → embed as `<image>`:
+>      ```
+>      python3 ${SKILL_DIR}/scripts/latex_to_svg.py "\\rho_L = \\frac{v_\\perp}{\\omega_c}" -o <project_path>/images/formula_inline_<NNN>.svg
+>      ```
+>      Then embed as `<image href="../images/formula_inline_<NNN>.svg" .../>`. Counter `<NNN>` from 901.
+>    - **Per-page mandatory pre-scan**: before writing each page, scan ALL planned text. Classify each formula-like token as Tier A or Tier B. Raw patterns without `baseline-shift` or `<image>` → blocking error. `svg_quality_checker.py` detects violations as **errors**.
 
 > [!IMPORTANT]
 > ## 🌐 Language & Communication Rule
 >
 > - **Response language**: match the user's input and source materials. Explicit user override (e.g., "请用英文回答") takes precedence.
 > - **Template format**: `design_spec.md` MUST follow its original English template structure (section headings, field names) regardless of conversation language. Content values may be in the user's language.
-> - **Deck text language is explicit**: before generating the PPT, Strategist MUST explicitly confirm which language the deck copy should use (e.g. Chinese / English / bilingual). Do not rely only on chat language when the user has not confirmed it.
-> - **Default deck language**: when the user has not specified a deck-copy language, Strategist MUST recommend `zh-CN` as the default option in the confirmation bundle. Switch to another language only on explicit user choice or when the source task clearly requires it.
+> - **Deck text language is explicit — ASK FIRST**: Strategist MUST proactively ask the user which language the PPT copy should use **before** presenting the Eight Confirmations bundle (e.g. Chinese / English / bilingual). This is the very first question in the pipeline. Do not infer from chat language alone; do not skip it.
+> - **Default deck language**: when the user has not specified a deck-copy language, Strategist MUST recommend `zh-CN` as the default option. Switch to another language only on explicit user choice or when the source task clearly requires it.
+> - **Light background by default**: unless the user **explicitly** requests a dark background (e.g. "用深色背景" / "dark background" / "dark tech style with dark bg"), every deck MUST use a light (white or near-white) page background. Merely choosing a "dark tech" visual style does NOT automatically trigger a dark background — the background stays light unless the user says otherwise. Record this in `design_spec.md §II` and `spec_lock.md`.
 
 > [!IMPORTANT]
 > ## 🔌 Compatibility With Generic Coding Skills
@@ -94,6 +103,22 @@ For complete tool documentation, see `${SKILL_DIR}/scripts/README.md`.
 ---
 
 ## Workflow
+
+### Step 0: Execution Mode Selection ⛔ BLOCKING
+
+Before starting the pipeline, ask the user:
+
+> **执行模式选择 / Execution Mode**:
+> 1. **一键执行模式 (One-click)** — 全流程自动执行，中间只在八次确认（Step 4）暂停等待用户确认，其余步骤（文件读写、脚本运行、SVG 生成、后处理、导出）全部自动完成，不再逐一请求权限。
+> 2. **逐步确认模式 (Step-by-step)** — 每个文件操作和命令执行都向用户请求权限后再执行（默认行为）。
+
+**If the user chooses one-click mode**:
+
+For **Claude Code** (VS Code extension): ensure the project has `.claude/settings.json` with tool permissions pre-configured (see repo root for the shipped file). If the file is missing, create it from the template. This file allows Claude Code to execute bash commands, read/write/edit project files without per-action approval.
+
+For **GitHub Copilot Agent**: instruct the user to enable auto-approve in VS Code settings: `Settings → search "agent auto" → enable "Chat > Agent: Auto Approve"`, or selectively approve tool categories (terminal, edit, etc.) when the first prompt appears by clicking "Always allow".
+
+After confirming the mode, proceed to Step 1.
 
 ### Step 1: Source Content Processing
 

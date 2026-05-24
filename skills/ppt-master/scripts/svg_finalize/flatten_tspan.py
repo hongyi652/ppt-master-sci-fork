@@ -26,6 +26,7 @@ TEXT_STYLE_ATTRS = {
     "text-anchor",
     "text-decoration",
     "dominant-baseline",
+    "baseline-shift",
     "writing-mode",
     "direction",
     # color/paint

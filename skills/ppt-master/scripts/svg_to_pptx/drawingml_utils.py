@@ -389,6 +389,18 @@ def parse_font_family(font_family_str: str) -> dict[str, str]:
 
     Prioritizes Windows-available fonts since PPTX is primarily opened on
     Windows. macOS/Linux-only fonts are mapped via FONT_FALLBACK_WIN.
+
+    **CJK-first metric-consistency rule**: when the first concrete font in the
+    stack is a CJK font (e.g. ``"Microsoft YaHei", sans-serif``), the CJK font
+    is used for BOTH ``latin`` and ``ea`` slots. This ensures all characters in
+    a run share the same font metrics (ascender, descender, x-height), preventing
+    the misalignment that occurs when PowerPoint renders Latin characters in
+    Segoe UI and CJK characters in YaHei at the same point size but with
+    different visual weights/heights.
+
+    Generic CSS fallbacks (``sans-serif``, ``serif``, ``monospace``) are only
+    applied to the ``latin`` slot when the first concrete font is a Latin font
+    or when no concrete font was specified at all.
     """
     if not font_family_str:
         return {'latin': 'Segoe UI', 'ea': 'Microsoft YaHei'}
@@ -396,14 +408,23 @@ def parse_font_family(font_family_str: str) -> dict[str, str]:
     fonts = [f.strip().strip("'\"") for f in font_family_str.split(',')]
     latin_font = None
     ea_font = None
+    first_concrete = None          # first non-system non-generic font
 
     for font in fonts:
         if font in SYSTEM_FONTS:
             continue
         if font in GENERIC_FONT_MAP:
-            resolved = GENERIC_FONT_MAP[font]
-            latin_font = latin_font or resolved
+            # Only use the generic as latin fallback when the primary font is
+            # NOT CJK.  If the stack leads with a CJK font, the user intends
+            # it for all scripts; a generic like ``sans-serif`` should not
+            # inject a metrically-incompatible Latin font.
+            if first_concrete is None or first_concrete not in EA_FONTS:
+                resolved = GENERIC_FONT_MAP[font]
+                latin_font = latin_font or resolved
             continue
+
+        if first_concrete is None:
+            first_concrete = font
 
         win_font = FONT_FALLBACK_WIN.get(font, font)
         if font in EA_FONTS:
