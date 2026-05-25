@@ -54,6 +54,11 @@ except ImportError:
     _parse_spec_lock = None  # spec_lock drift check will be skipped
 
 try:
+    from formula_display_policy import minimum_formula_display_floor
+except ImportError:
+    minimum_formula_display_floor = None
+
+try:
     from svg_to_pptx.animation_config import (
         load_animation_config as _load_animation_config,
         validate_animation_config as _validate_animation_config,
@@ -614,6 +619,33 @@ class SVGQualityChecker:
             return None
 
     @staticmethod
+    def _coerce_positive_float(value: object) -> float | None:
+        """Return a positive float when possible."""
+        if isinstance(value, (int, float)):
+            numeric = float(value)
+            return numeric if numeric > 0 else None
+        if isinstance(value, str):
+            try:
+                numeric = float(value.strip())
+            except ValueError:
+                return None
+            return numeric if numeric > 0 else None
+        return None
+
+    @staticmethod
+    def _measure_svg_root_dimensions(path: Path) -> tuple[float | None, float | None]:
+        """Extract root SVG width/height for formula readability checks."""
+        try:
+            text = path.read_text(encoding='utf-8', errors='replace')
+        except OSError:
+            return None, None
+        width_match = re.search(r'<svg\b[^>]*\bwidth=["\']([0-9.]+)', text)
+        height_match = re.search(r'<svg\b[^>]*\bheight=["\']([0-9.]+)', text)
+        width = float(width_match.group(1)) if width_match else None
+        height = float(height_match.group(1)) if height_match else None
+        return width, height
+
+    @staticmethod
     def _parse_image_par(value: str | None) -> tuple[str, str]:
         """Parse preserveAspectRatio into ``(align, mode)``."""
         raw = (value or 'xMidYMid meet').strip()
@@ -644,6 +676,84 @@ class SVGQualityChecker:
         else:
             scale = min(box_w / actual_w, box_h / actual_h)
         return actual_w * scale, actual_h * scale
+
+    @staticmethod
+    def _content_box_from_viewbox(content: str) -> tuple[int, int]:
+        """Approximate the usable content box for formula sizing checks."""
+        match = re.search(r'viewBox="0 0 ([0-9.]+) ([0-9.]+)"', content)
+        if not match:
+            return 1160, 600
+        try:
+            canvas_w = float(match.group(1))
+            canvas_h = float(match.group(2))
+        except ValueError:
+            return 1160, 600
+        content_w = max(320, int(round(canvas_w - 120)))
+        content_h = max(200, int(round(canvas_h - 120)))
+        return content_w, content_h
+
+    def _check_formula_image_readability(
+        self,
+        attrs: str,
+        href: str,
+        svg_path: Path,
+        img_path: Path,
+        box_w: float,
+        box_h: float,
+        preserve_aspect_ratio: str | None,
+        content: str,
+        result: Dict,
+    ) -> None:
+        """Require formula SVGs to stay above a readable on-slide size floor."""
+        if minimum_formula_display_floor is None:
+            return
+
+        entry = self._load_formula_lookup(svg_path).get(Path(href).name)
+        if not entry:
+            return
+
+        natural_w = self._coerce_positive_float(entry.get('svg_width'))
+        natural_h = self._coerce_positive_float(entry.get('svg_height'))
+        if natural_w is None or natural_h is None:
+            measured_w, measured_h = self._measure_svg_root_dimensions(img_path)
+            natural_w = natural_w or measured_w
+            natural_h = natural_h or measured_h
+        if natural_w is None or natural_h is None:
+            return
+
+        effective_w, effective_h = self._effective_image_display_size(
+            natural_w,
+            natural_h,
+            box_w,
+            box_h,
+            preserve_aspect_ratio,
+        )
+        if effective_w <= 0 or effective_h <= 0:
+            return
+
+        content_w, content_h = self._content_box_from_viewbox(content)
+        floor = minimum_formula_display_floor(
+            natural_w,
+            natural_h,
+            content_w,
+            content_h,
+            latex=str(entry.get('latex') or ''),
+            display=bool(entry.get('display', True)),
+        )
+        min_h = self._coerce_positive_float(floor.get('min_display_h')) if floor else None
+        min_w = self._coerce_positive_float(floor.get('min_display_w')) if floor else None
+        if min_h is None or min_w is None:
+            return
+        if effective_h + 0.5 >= min_h:
+            return
+
+        recommended_w = int(round(self._coerce_positive_float(floor.get('recommended_display_w')) or min_w))
+        recommended_h = int(round(self._coerce_positive_float(floor.get('recommended_display_h')) or min_h))
+        result['errors'].append(
+            f"Formula image {href} is displayed at {int(round(effective_w))}x{int(round(effective_h))}, "
+            f"below the readable minimum {int(round(min_w))}x{int(round(min_h))}. "
+            f"Recommended display is about {recommended_w}x{recommended_h}; enlarge the <image> frame instead of shrinking the formula below readable size."
+        )
 
     def _check_image_references(self, content: str, svg_path: Path, result: Dict):
         """Check image file existence and resolution vs display size."""
@@ -723,6 +833,18 @@ class SVGQualityChecker:
                     continue
             except (ValueError, TypeError):
                 continue
+
+            self._check_formula_image_readability(
+                attrs,
+                href,
+                svg_path,
+                img_path,
+                display_w,
+                display_h,
+                par_value,
+                content,
+                result,
+            )
 
             try:
                 from PIL import Image as PILImage
@@ -1456,6 +1578,8 @@ class SVGQualityChecker:
             return 'foreignObject'
         elif 'Plain-text formula' in error_msg:
             return 'Plain-text formula (Iron Rule §4.1)'
+        elif 'Formula image' in error_msg and 'readable minimum' in error_msg:
+            return 'Formula image too small'
         elif 'Fake sub/superscript' in error_msg:
             return 'Fake sub/superscript (Iron Rule §4.1)'
         elif 'Split-sentence' in error_msg:

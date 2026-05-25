@@ -60,6 +60,9 @@ from latex_to_svg import annotate_formula_svg  # noqa: E402
 from latex_to_svg import FormulaEntry  # noqa: E402
 from latex_to_svg import load_manifest as load_formula_manifest  # noqa: E402
 from latex_to_svg import save_manifest as save_formula_manifest  # noqa: E402
+from formula_display_policy import fit_formula_display  # noqa: E402
+from formula_display_policy import formula_compact_length  # noqa: E402
+from formula_display_policy import recommend_formula_display as _shared_recommend_formula_display  # noqa: E402
 
 IMAGE_EXTENSIONS = {
     ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".tif",
@@ -208,7 +211,7 @@ def _recommended_display_for_size(
 
 def _latex_compact_length(latex: str) -> int:
     """Return a rough visual complexity score for LaTeX text."""
-    return len(re.sub(r"\s+", "", latex or ""))
+    return formula_compact_length(latex)
 
 
 def _fit_formula_display(
@@ -219,13 +222,7 @@ def _fit_formula_display(
     max_w: int,
 ) -> tuple[int, int]:
     """Scale formula dimensions to a bounded display box."""
-    ratio = width / height
-    display_h = max(1, target_h)
-    display_w = int(round(display_h * ratio))
-    if display_w > max_w:
-        display_w = max_w
-        display_h = max(1, int(round(display_w / ratio)))
-    return display_w, display_h
+    return fit_formula_display(width, height, target_h=target_h, max_w=max_w)
 
 
 def _recommend_formula_display(
@@ -238,47 +235,14 @@ def _recommend_formula_display(
     display: bool = True,
 ) -> dict[str, object]:
     """Compute formula display dimensions without over-scaling short formulas."""
-    if width <= 0 or height <= 0:
-        return {}
-
-    compact_len = _latex_compact_length(latex)
-    is_short = not display or width <= 60 or compact_len <= 45
-    is_medium = width <= 140 or compact_len <= 110
-
-    if is_short:
-        target_h = int(round(max(22, min(48, height * 2.5))))
-        display_w, display_h = _fit_formula_display(
-            width,
-            height,
-            target_h=target_h,
-            max_w=min(content_w, 320),
-        )
-        return {
-            "layout": "inline-or-callout",
-            "display_w": display_w,
-            "display_h": display_h,
-            "scale_note": "short formula: keep near text scale; do not enlarge to hero size",
-        }
-
-    if is_medium:
-        target_h = int(round(max(40, min(88, height * 2.6))))
-        display_w, display_h = _fit_formula_display(
-            width,
-            height,
-            target_h=target_h,
-            max_w=min(content_w, 560),
-        )
-        return {
-            "layout": "formula-compact",
-            "display_w": display_w,
-            "display_h": display_h,
-            "scale_note": "compact formula: cap size unless it is the slide's main object",
-        }
-
-    display_info = _recommended_display_for_size(width, height, content_w, content_h)
-    if display_info:
-        display_info["scale_note"] = "display equation: may use recommended full-width sizing"
-    return display_info
+    return _shared_recommend_formula_display(
+        width,
+        height,
+        content_w,
+        content_h,
+        latex=latex,
+        display=display,
+    )
 
 
 def _entry_text(entry: object, name: str) -> str:

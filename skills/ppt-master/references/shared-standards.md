@@ -233,13 +233,20 @@ FOR each text string planned for this page:
     2. CONVERT to SVG image:
        a. Check formula_manifest.json / notes/formula_asset_table.md for existing formula_*.svg
        b. If found → embed: <image href="../images/formula_XXX.svg" data-formula-id="XXX" .../>
-          Follow formula_asset_table.md Recommended display / Scale note; short formulas stay near text scale.
+         Follow formula_asset_table.md Recommended display / Scale note; short formulas stay near text scale, but the recommended display is also the readable-size floor.
        c. If NOT found → generate on-the-fly:
           python3 ${SKILL_DIR}/scripts/latex_to_svg.py "<latex>" -o <project>/images/formula_inline_<NNN>.svg
           (counter <NNN> from 901, incrementing)
        d. Embed the generated SVG as <image>
     3. NEVER fall back to plain text or Tier A without meeting ALL exception criteria.
        If latex_to_svg.py fails, surface the error and stop.
+
+  **Minimum readable size rule**:
+
+  - Formula SVGs in PPT must not be placed below their readable-size floor.
+  - Use `notes/formula_asset_table.md` `Recommended display` as the minimum on-slide size, not as an optional suggestion.
+  - Short / inline formulas may stay near text scale, but "near text scale" does **not** mean tiny. Placements like `134 x 18` for a roughly 10-character formula are too small and are forbidden.
+  - `svg_quality_checker.py` treats undersized formula `<image>` placements as blocking errors.
 ```
 
 #### Tier A — Native Sub/Superscript via `baseline-shift` (EXCEPTION ONLY)
@@ -369,7 +376,7 @@ These are plain text and do NOT require conversion:
 
 #### Quality Gate
 
-`svg_quality_checker.py` detects raw plain-text formula patterns (underscore notation `a_1`, caret notation `x^2`, fraction slashes between math variables `ΔT/Δt`, short-variable equations `E=mc²`, radicals, and integral/summation with limits) in `<text>` / `<tspan>` content and reports them as **errors** (not warnings). It also treats split fake sub/superscripts such as separate `m` + `-3` or `H` + `2` text boxes as **errors**. The following are NOT flagged: Unicode sub/superscript characters (allowed as shorthand), abbreviation slashes (`HS/VSS`, `E/B`), unit rates (`m/s`, `steps/sec`), and long-name definitions. Properly marked `<tspan baseline-shift="sub/super">` elements are also NOT flagged.
+`svg_quality_checker.py` detects raw plain-text formula patterns (underscore notation `a_1`, caret notation `x^2`, fraction slashes between math variables `ΔT/Δt`, short-variable equations `E=mc²`, radicals, and integral/summation with limits) in `<text>` / `<tspan>` content and reports them as **errors** (not warnings). It also treats split fake sub/superscripts such as separate `m` + `-3` or `H` + `2` text boxes as **errors**, and flags formula SVG `<image>` placements that fall below the readable-size floor. The following are NOT flagged: Unicode sub/superscript characters (allowed as shorthand), abbreviation slashes (`HS/VSS`, `E/B`), unit rates (`m/s`, `steps/sec`), and long-name definitions. Properly marked `<tspan baseline-shift="sub/super">` elements are also NOT flagged.
 
 ### Inline Text Runs (Single Logical Line = Single `<text>`)
 
