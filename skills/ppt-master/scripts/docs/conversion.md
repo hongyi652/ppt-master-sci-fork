@@ -2,7 +2,7 @@
 
 > Architecture rationale (why MinerU is the only PDF path, why pandoc remains a fallback for some document formats, and why curl_cffi is used for TLS impersonation): see [docs/technical-design.md "Source Content Conversion"](../../../../docs/technical-design.md#source-content-conversion).
 
-Source conversion tools turn PDFs, documents, slide decks, and web pages into Markdown before project creation.
+Source conversion tools are low-level building blocks behind `project_manager.py import-sources`. In the normal PPT workflow, create the project first and import sources so every derived Markdown file, `_files/` directory, zip, and report stays inside the project tree instead of beside the original source document.
 
 ## PDF parsing via `source_to_md/mineru_to_md.py`
 
@@ -10,10 +10,14 @@ PPT Master now uses MinerU as the only supported PDF parser. The older `source_t
 
 MinerU normalizes its result zip into the project convention used throughout the repo: `<output>.md` plus a sibling `<output>_files/` directory. Extracted images are referenced from Markdown and `image_manifest.json` is written for project import.
 
+Preferred workflow:
+- `python3 scripts/project_manager.py import-sources <project_path> <file.pdf>`
+- Standalone `convert_pdf.py` / `mineru_to_md.py` is only for exceptional repair flows, and must use `-o <project_path>/sources/<name>.md`
+
 ```bash
-python3 scripts/source_to_md/mineru_to_md.py paper.pdf
-python3 scripts/source_to_md/mineru_to_md.py paper.pdf -o output.md --is-ocr
-python3 scripts/source_to_md/mineru_to_md.py mineru_result.zip --from-zip -o output.md
+python3 scripts/source_to_md/mineru_to_md.py paper.pdf -o projects/demo/sources/paper.md
+python3 scripts/source_to_md/mineru_to_md.py paper.pdf -o projects/demo/sources/paper.md --is-ocr
+python3 scripts/source_to_md/mineru_to_md.py mineru_result.zip --from-zip -o projects/demo/sources/paper.md
 python3 scripts/project_manager.py import-sources projects/demo paper.pdf --move
 ```
 
@@ -57,7 +61,7 @@ pip install mammoth markdownify ebooklib nbconvert beautifulsoup4
 # Windows: https://pandoc.org/installing.html
 ```
 
-All paths produce the same output convention: `<input>.md` plus a sibling `<input>_files/` directory containing extracted images with relative references.
+When you run a low-level converter manually, always pass `-o` inside the target project's `sources/` directory. The normalized result is `<output>.md` plus a sibling `<output>_files/` directory containing extracted images with relative references.
 
 ## `source_to_md/excel_to_md.py`
 
@@ -194,6 +198,8 @@ Behavior:
 - generates a minimal `.tex` file using the `standalone` document class
 - compiles with `latex` (or `xelatex`/`pdflatex` if `latex` is unavailable)
 - converts DVI/PDF to SVG via `dvisvgm --no-fonts --exact-bbox`
+- embeds non-visual `<title>` / `<desc>` metadata plus `data-formula-*` root
+  attributes so each SVG remains traceable to its LaTeX source
 - in manifest mode, processes all entries with `"render": true`, writes SVGs to the
   manifest directory as `formula_*.svg`, and updates each entry's status and dimensions
 
@@ -207,5 +213,7 @@ Dependency:
 Pipeline integration:
 1. Step 1 (Source Processing): run `extract_formulas.py` after MinerU conversion
 2. Step 4 (Strategist): AI reviews `formula_manifest.json`, sets `"render": true`
-3. Step 5 (Image Acquisition): run `latex_to_svg.py --manifest` to generate SVGs
-4. Step 6 (Executor): reference as `<image href="../images/formula_*.svg" />`
+3. Step 5 (Image Acquisition): run `latex_to_svg.py --manifest` to generate SVGs,
+   then `stabilize_image_assets.py` to refresh `notes/formula_asset_table.md`
+4. Step 6 (Executor): read `notes/formula_asset_table.md`, reference `SVG href`,
+   add `data-formula-id`, and respect short-formula scale guidance

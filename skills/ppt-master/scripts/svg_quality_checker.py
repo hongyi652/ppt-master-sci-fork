@@ -225,6 +225,7 @@ class SVGQualityChecker:
         }
         self._lock_seen = False  # True once we locate at least one spec_lock.md
         self._source_manifest_cache: Dict[Path, Dict] = {}
+        self._formula_manifest_cache: Dict[Path, Dict[str, Dict]] = {}
         # Template-mode aggregation (populated by check_directory when
         # template_mode=True). Each entry is (severity, kind, message) where
         # severity is 'error' or 'warning'. Printed in print_summary.
@@ -667,9 +668,19 @@ class SVGQualityChecker:
             if href in checked:
                 continue
             checked.add(href)
+            self._check_formula_image_metadata(attrs, href, svg_path, result)
 
             # Resolve path relative to SVG file directory
             img_path = (svg_dir / href).resolve()
+
+            if not img_path.exists():
+                formula_alias_path = self._resolve_formula_image_alias(svg_path, href)
+                if formula_alias_path is not None:
+                    img_path = formula_alias_path.resolve()
+                else:
+                    result['errors'].append(
+                        f"Image file not found: {href} (resolved to {img_path})")
+                    continue
 
             if not img_path.exists():
                 result['errors'].append(
@@ -920,6 +931,98 @@ class SVGQualityChecker:
             payload = {}
         self._source_manifest_cache[manifest_path] = payload
         return payload
+
+    def _find_formula_manifest(self, svg_path: Path) -> Path | None:
+        """Locate formula_manifest.json for a project SVG."""
+        bases = (svg_path.parent, svg_path.parent.parent, svg_path.parent.parent.parent)
+        for base in bases:
+            candidate = base / 'images' / 'formula_manifest.json'
+            if candidate.exists():
+                return candidate
+        return None
+
+    def _load_formula_lookup(self, svg_path: Path) -> Dict[str, Dict]:
+        """Load formula SVG/alias/id lookup entries."""
+        manifest_path = self._find_formula_manifest(svg_path)
+        if manifest_path is None:
+            return {}
+        if manifest_path in self._formula_manifest_cache:
+            return self._formula_manifest_cache[manifest_path]
+
+        try:
+            payload = json.loads(manifest_path.read_text(encoding='utf-8'))
+        except (OSError, json.JSONDecodeError):
+            payload = {}
+
+        formulas = payload.get('formulas') if isinstance(payload, dict) else payload
+        lookup: Dict[str, Dict] = {}
+        if isinstance(formulas, list):
+            for entry in formulas:
+                if not isinstance(entry, dict):
+                    continue
+                keys = {
+                    str(entry.get('id') or '').strip(),
+                    Path(str(entry.get('svg_path') or '')).name,
+                    Path(str(entry.get('filename') or '')).name,
+                    Path(str(entry.get('short_alias') or '')).name,
+                }
+                for key in keys:
+                    if key:
+                        lookup[key] = entry
+
+        self._formula_manifest_cache[manifest_path] = lookup
+        return lookup
+
+    def _resolve_formula_image_alias(self, svg_path: Path, href: str) -> Path | None:
+        """Resolve a formula short_alias href to the actual formula SVG."""
+        lookup = self._load_formula_lookup(svg_path)
+        entry = lookup.get(Path(href).name)
+        if not entry:
+            return None
+        svg_name = Path(str(entry.get('svg_path') or '')).name
+        if not svg_name:
+            return None
+        manifest_path = self._find_formula_manifest(svg_path)
+        if manifest_path is None:
+            return None
+        resolved = manifest_path.parent / svg_name
+        return resolved if resolved.is_file() else None
+
+    def _check_formula_image_metadata(
+        self,
+        attrs: str,
+        href: str,
+        svg_path: Path,
+        result: Dict,
+    ) -> None:
+        """Check formula image references against formula_manifest.json."""
+        lookup = self._load_formula_lookup(svg_path)
+        filename = Path(href).name
+        is_formula_like = filename.lower().startswith(('formula_', 'eq'))
+        entry = lookup.get(filename)
+        if not entry:
+            if is_formula_like:
+                result['warnings'].append(
+                    f"Formula image {href} is not listed in formula_manifest.json; "
+                    "AI cannot reliably map this SVG back to its LaTeX source."
+                )
+            return
+
+        expected_id = str(entry.get('id') or '').strip()
+        id_match = re.search(r'\bdata-formula-id="([^"]+)"', attrs)
+        if not id_match:
+            result['warnings'].append(
+                f"Formula image {href} is missing data-formula-id=\"{expected_id}\"; "
+                "add it so the slide preserves the manifest link."
+            )
+            return
+
+        actual_id = id_match.group(1).strip()
+        if expected_id and actual_id != expected_id:
+            result['errors'].append(
+                f"Formula image {href} has data-formula-id=\"{actual_id}\" "
+                f"but formula_manifest.json expects \"{expected_id}\"."
+            )
 
     def _check_sourced_image_attribution(self, content: str, svg_path: Path, result: Dict):
         """Require visible credit text for attribution-required web images.

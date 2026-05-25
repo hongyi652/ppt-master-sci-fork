@@ -992,7 +992,7 @@ class ProjectManager:
         if asset_count:
             summary["notes"].append(
                 f"Asset stabilization: {asset_count} asset(s) measured, "
-                f"including {formula_count} formula SVG(s); aliases + size table written."
+                f"including {formula_count} formula SVG(s); aliases + asset tables written."
             )
 
         summary["notes"].append("Import report: notes/import_sources_report.json")

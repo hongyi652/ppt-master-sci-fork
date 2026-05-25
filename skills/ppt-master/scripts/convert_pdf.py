@@ -8,13 +8,13 @@ retries the script prints clear fallback instructions instead of a raw
 traceback.
 
 Usage:
-    python3 scripts/convert_pdf.py <file.pdf> -o output.md
+    python3 scripts/convert_pdf.py <file.pdf> -o <project_path>/sources/output.md
     python3 scripts/convert_pdf.py <file.pdf> --retries 3 --keep-zip
     python3 scripts/convert_pdf.py <file.pdf> --is-ocr --timeout 600
 
 Examples:
-    python3 scripts/convert_pdf.py paper.pdf
-    python3 scripts/convert_pdf.py paper.pdf -o sources/paper.md --keep-zip
+    python3 scripts/convert_pdf.py paper.pdf -o projects/demo/sources/paper.md
+    python3 scripts/convert_pdf.py paper.pdf -o projects/demo/sources/paper.md --keep-zip
     python3 scripts/convert_pdf.py paper.pdf --retries 2 --is-ocr
 
 Dependencies:
@@ -78,6 +78,14 @@ def _setup_proxy_bypass() -> list[str]:
 def _collect_proxy_snapshot() -> dict[str, str]:
     """Snapshot current proxy env vars for the report."""
     return {key: os.environ.get(key, "") for key in PROXY_ENV_KEYS if os.environ.get(key)}
+
+
+def _find_project_root(path: Path) -> Path | None:
+    """Return the nearest enclosing project directory when one exists."""
+    for parent in path.resolve().parents:
+        if (parent / "sources").is_dir() and (parent / "notes").is_dir():
+            return parent
+    return None
 
 
 # ------------------------------------------------------------------
@@ -232,7 +240,11 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("input", help="PDF file to convert.")
-    parser.add_argument("-o", "--output", help="Output Markdown path (default: <input>.md).")
+    parser.add_argument(
+        "-o",
+        "--output",
+        help="Output Markdown path. Required when the input file is outside a project tree.",
+    )
     parser.add_argument(
         "--from-zip", action="store_true",
         help="Treat input as an existing MinerU result zip; skip API calls.",
@@ -278,7 +290,18 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[ERROR] File not found: {input_path}", file=sys.stderr)
         return 1
 
-    output_path = Path(args.output) if args.output else input_path.with_suffix(".md")
+    if args.output:
+        output_path = Path(args.output)
+    else:
+        if _find_project_root(input_path) is None:
+            print(
+                "[ERROR] Refusing to write conversion artifacts next to the original source file. "
+                "Create the project first and use project_manager.py import-sources, or pass "
+                "-o <project_path>/sources/<name>.md explicitly.",
+                file=sys.stderr,
+            )
+            return 1
+        output_path = input_path.with_suffix(".md")
     output_path = output_path.resolve()
     report_path = output_path.with_suffix(".convert_report.json")
 

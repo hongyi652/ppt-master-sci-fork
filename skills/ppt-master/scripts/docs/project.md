@@ -22,6 +22,7 @@ Notes:
   note), to avoid leaving unintended artifacts that could be committed by mistake.
   Pass `--copy` to force a copy for in-repo sources instead.
 - `--move` and `--copy` are mutually exclusive.
+- `import-sources` is the preferred entry point for PDFs, Office docs, PPTX, Excel, and URLs because it keeps converted Markdown, companion `_files/` directories, and conversion reports inside the project tree instead of beside the original source file.
 
 Common formats:
 - `ppt169`

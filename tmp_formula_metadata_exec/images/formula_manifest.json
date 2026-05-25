@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "formulas": [
+    {
+      "id": "inline_990",
+      "latex": "T_e = 10^2",
+      "display": false,
+      "render": true,
+      "context": "Electron temperature note uses inline Te notation",
+      "status": "rendered",
+      "source_file": "page_02_outline.md",
+      "line_number": 18,
+      "svg_path": "formula_inline_990.svg",
+      "svg_width": 36.628782,
+      "svg_height": 9.810118,
+      "svg_title": "Formula inline_990",
+      "svg_desc": "latex: T_e = 10^2 | display: inline | source: page_02_outline.md:18 | context: Electron temperature note uses inline Te notation"
+    }
+  ]
+}

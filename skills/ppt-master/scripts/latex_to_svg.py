@@ -11,6 +11,7 @@ Usage:
 
 Examples:
     python3 scripts/latex_to_svg.py "\\frac{a}{b}" -o out.svg
+    python3 scripts/latex_to_svg.py "x^2" -o images/formula_inline_901.svg --inline --source-file slide_02.md --line-number 18 --context "Diffusion coefficient units use m^2/s"
     python3 scripts/latex_to_svg.py --manifest projects/demo/images/formula_manifest.json
     python3 scripts/latex_to_svg.py --manifest projects/demo/images/formula_manifest.json --font-size 14
 
@@ -22,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import html
 import json
 import os
 import re
@@ -55,6 +57,7 @@ INLINE_WRAP = r"${formula}$"
 DEFAULT_BORDER_PT = 2
 DEFAULT_FONT_SIZE_PT = 12
 SVG_FILENAME_PREFIX = "formula_"
+FORMULA_MANIFEST_FILENAME = "formula_manifest.json"
 MANIFEST_VERSION = 1
 
 
@@ -204,6 +207,121 @@ def _parse_svg_dimensions(svg_path: Path) -> tuple[float | None, float | None]:
     return width, height
 
 
+def _collapse_metadata_text(text: str, *, limit: int = 500) -> str:
+    """Collapse whitespace and cap metadata text."""
+    collapsed = re.sub(r"\s+", " ", text or "").strip()
+    if len(collapsed) <= limit:
+        return collapsed
+    return collapsed[: limit - 1].rstrip() + "…"
+
+
+def _metadata_id(value: str) -> str:
+    """Return a safe XML id suffix."""
+    safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", value or "formula").strip("_")
+    return safe or "formula"
+
+
+def annotate_formula_svg(
+    svg_path: Path,
+    *,
+    formula_id: str = "",
+    latex: str = "",
+    display: bool = True,
+    source_file: str = "",
+    line_number: int | None = None,
+    context: str = "",
+    short_alias: str = "",
+) -> tuple[str, str]:
+    """Embed non-visual formula metadata into a rendered SVG."""
+    try:
+        text = svg_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return "", ""
+
+    svg_match = re.search(r"<svg\b[^>]*>", text, re.IGNORECASE | re.DOTALL)
+    if not svg_match:
+        return "", ""
+
+    label = formula_id or svg_path.stem.replace(SVG_FILENAME_PREFIX, "", 1)
+    title = f"Formula {label}".strip()
+    desc_parts = [
+        f"latex: {_collapse_metadata_text(latex, limit=600)}",
+        f"display: {'display' if display else 'inline'}",
+    ]
+    if source_file:
+        source = source_file
+        if line_number is not None:
+            source = f"{source}:{line_number}"
+        desc_parts.append(f"source: {_collapse_metadata_text(source, limit=180)}")
+    if short_alias:
+        desc_parts.append(f"alias: {_collapse_metadata_text(short_alias, limit=120)}")
+    if context:
+        desc_parts.append(f"context: {_collapse_metadata_text(context, limit=320)}")
+    desc = " | ".join(part for part in desc_parts if part.strip())
+
+    text = re.sub(
+        r'\s*<title\s+id=["\']formula-title-[^"\']+["\']>.*?</title>\s*',
+        "\n",
+        text,
+        count=1,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    text = re.sub(
+        r'\s*<desc\s+id=["\']formula-desc-[^"\']+["\']>.*?</desc>\s*',
+        "\n",
+        text,
+        count=1,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+
+    root_tag = svg_match.group(0)
+    clean_root_tag = re.sub(
+        r'\s+data-formula-(?:id|display|source|line|alias)=["\'][^"\']*["\']',
+        "",
+        root_tag,
+        flags=re.IGNORECASE,
+    )
+    if clean_root_tag != root_tag:
+        text = text[:svg_match.start()] + clean_root_tag + text[svg_match.end():]
+        svg_match = re.search(r"<svg\b[^>]*>", text, re.IGNORECASE | re.DOTALL)
+        if not svg_match:
+            return title, desc
+        root_tag = svg_match.group(0)
+
+    attrs: dict[str, str] = {
+        "data-formula-id": label,
+        "data-formula-display": "display" if display else "inline",
+    }
+    if source_file:
+        attrs["data-formula-source"] = _collapse_metadata_text(source_file, limit=120)
+    if line_number is not None:
+        attrs["data-formula-line"] = str(line_number)
+    if short_alias:
+        attrs["data-formula-alias"] = short_alias
+
+    attr_text = ""
+    for name, value in attrs.items():
+        if re.search(rf"\b{name}\s*=", root_tag):
+            continue
+        attr_text += f' {name}="{html.escape(value, quote=True)}"'
+
+    if attr_text:
+        insert_at = svg_match.end() - 1
+        text = text[:insert_at] + attr_text + text[insert_at:]
+        svg_match = re.search(r"<svg\b[^>]*>", text, re.IGNORECASE | re.DOTALL)
+        if not svg_match:
+            return title, desc
+
+    safe_id = _metadata_id(label)
+    metadata_xml = (
+        f'\n<title id="formula-title-{safe_id}">{html.escape(title)}</title>\n'
+        f'<desc id="formula-desc-{safe_id}">{html.escape(desc)}</desc>\n'
+    )
+    text = text[:svg_match.end()] + metadata_xml + text[svg_match.end():]
+    svg_path.write_text(text, encoding="utf-8")
+    return title, desc
+
+
 def _run_quiet(cmd: list[str], cwd: Path, timeout: int = 60) -> subprocess.CompletedProcess:
     """Run a subprocess, capturing output, with timeout."""
     return subprocess.run(
@@ -327,6 +445,87 @@ def save_manifest(manifest_path: Path, entries: list[FormulaEntry]) -> None:
     )
 
 
+def _single_formula_id(output_path: Path) -> str:
+    """Return the manifest id for a single-formula SVG output."""
+    stem = output_path.stem
+    if stem.startswith(SVG_FILENAME_PREFIX):
+        return stem[len(SVG_FILENAME_PREFIX):]
+    return stem
+
+
+def maybe_register_single_formula(
+    output_path: Path,
+    *,
+    latex: str,
+    display: bool,
+    source_file: str | None = None,
+    line_number: int | None = None,
+    context: str | None = None,
+    title: str = "",
+    desc: str = "",
+) -> Path | None:
+    """Upsert a one-off formula SVG into the nearby project manifest.
+
+    This keeps ad hoc executor-generated files like formula_inline_901.svg
+    discoverable by later asset stabilization and formula QA checks.
+    """
+    output_path = output_path.resolve()
+    if not output_path.name.lower().endswith(".svg"):
+        return None
+    if not output_path.stem.startswith(SVG_FILENAME_PREFIX):
+        return None
+
+    manifest_path = output_path.parent / FORMULA_MANIFEST_FILENAME
+    entries: list[FormulaEntry]
+    if manifest_path.is_file():
+        try:
+            entries = load_manifest(manifest_path)
+        except Exception:
+            entries = []
+    else:
+        entries = []
+
+    formula_id = _single_formula_id(output_path)
+    width, height = _parse_svg_dimensions(output_path)
+    entry = next(
+        (
+            item for item in entries
+            if item.id == formula_id or Path(item.svg_path).name == output_path.name
+        ),
+        None,
+    )
+    if entry is None:
+        entry = FormulaEntry(
+            id=formula_id,
+            latex=latex,
+            display=display,
+            render=True,
+        )
+        entries.append(entry)
+
+    entry.latex = latex
+    entry.display = display
+    entry.render = True
+    entry.status = "rendered"
+    entry.svg_path = output_path.name
+    entry.svg_width = width
+    entry.svg_height = height
+    entry.error = ""
+    if source_file is not None:
+        entry.source_file = source_file
+    if line_number is not None:
+        entry.line_number = line_number
+    if context is not None:
+        entry.context = context
+    if title:
+        entry.extra["svg_title"] = title
+    if desc:
+        entry.extra["svg_desc"] = desc
+
+    save_manifest(manifest_path, entries)
+    return manifest_path
+
+
 def process_manifest(
     manifest_path: Path,
     *,
@@ -370,11 +569,25 @@ def process_manifest(
                 dvisvgm_path=dvisvgm,
             )
             w, h = _parse_svg_dimensions(svg_path)
+            title, desc = annotate_formula_svg(
+                svg_path,
+                formula_id=entry.id,
+                latex=entry.latex,
+                display=entry.display,
+                source_file=entry.source_file,
+                line_number=entry.line_number,
+                context=entry.context,
+                short_alias=str(entry.extra.get("short_alias", "") or ""),
+            )
             entry.svg_path = svg_name
             entry.svg_width = w
             entry.svg_height = h
             entry.status = "rendered"
             entry.error = ""
+            if title:
+                entry.extra["svg_title"] = title
+            if desc:
+                entry.extra["svg_desc"] = desc
             rendered += 1
             print(f"  [OK] {entry.id} → {svg_name}", file=sys.stderr)
         except Exception as exc:
@@ -434,6 +647,22 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Re-render formulas even if already marked rendered.",
     )
+    parser.add_argument(
+        "--source-file",
+        default=None,
+        help="Source file label to store in SVG metadata and formula_manifest.json (single-formula mode only).",
+    )
+    parser.add_argument(
+        "--line-number",
+        type=int,
+        default=None,
+        help="1-based source line number for the formula metadata (single-formula mode only).",
+    )
+    parser.add_argument(
+        "--context",
+        default=None,
+        help="Short surrounding text to store as formula context metadata (single-formula mode only).",
+    )
     return parser
 
 
@@ -471,8 +700,30 @@ def main(argv: list[str] | None = None) -> int:
             display=display,
             border_pt=args.border,
         )
+        formula_id = _single_formula_id(result_path)
+        title, desc = annotate_formula_svg(
+            result_path,
+            formula_id=formula_id,
+            latex=args.formula,
+            display=display,
+            source_file=args.source_file or "",
+            line_number=args.line_number,
+            context=args.context or "",
+        )
+        manifest_path = maybe_register_single_formula(
+            result_path,
+            latex=args.formula,
+            display=display,
+            source_file=args.source_file,
+            line_number=args.line_number,
+            context=args.context,
+            title=title,
+            desc=desc,
+        )
         print(str(result_path))
         print(f"[OK] SVG saved to: {result_path}", file=sys.stderr)
+        if manifest_path is not None:
+            print(f"[OK] Manifest updated: {manifest_path}", file=sys.stderr)
         return 0
     except Exception as exc:
         print(f"[ERROR] {exc}", file=sys.stderr)

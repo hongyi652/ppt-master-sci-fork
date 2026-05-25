@@ -324,6 +324,10 @@ Handle images by their status in the Design Spec's Image Resource List. Status e
 
 **Reference syntax**: see [`svg-image-embedding.md`](svg-image-embedding.md).
 
+**Formula SVG lookup**: read `notes/formula_asset_table.md` before placing any rendered formula. Use the table's `SVG href` as the `<image href="../images/...">` value, add `data-formula-id="<id>"`, and follow `Recommended display` / `Scale note`.
+
+**Formula sizing**: short / inline formulas (`inline-or-callout`, `formula-compact`) must stay near text or callout scale unless the formula is explicitly the page's main object.
+
 **Placeholder**: Dashed border `<rect stroke-dasharray="8,4" .../>` + description text
 
 **Legacy `no-crop` tag**: older specs may append ` | no-crop`; treat it as `Display mode: complete`. Untagged content-bearing images also default to complete display.

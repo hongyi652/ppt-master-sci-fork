@@ -230,8 +230,9 @@ FOR each text string planned for this page:
     1. Does it contain ANY formula-like expression (sub/super, fraction, equation, etc.)?
        → YES: Tier B — proceed to step 2
     2. CONVERT to SVG image:
-       a. Check formula_manifest.json / image_asset_table.md for existing formula_*.svg
-       b. If found → embed: <image href="../images/formula_XXX.svg" .../>
+       a. Check formula_manifest.json / notes/formula_asset_table.md for existing formula_*.svg
+       b. If found → embed: <image href="../images/formula_XXX.svg" data-formula-id="XXX" .../>
+          Follow formula_asset_table.md Recommended display / Scale note; short formulas stay near text scale.
        c. If NOT found → generate on-the-fly:
           python3 ${SKILL_DIR}/scripts/latex_to_svg.py "<latex>" -o <project>/images/formula_inline_<NNN>.svg
           (counter <NNN> from 901, incrementing)

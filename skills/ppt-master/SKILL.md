@@ -49,9 +49,10 @@ ${PYTHON} ${SKILL_DIR}/scripts/preflight_check.py <project_path>
 > 10. **⛔ IRON RULE — NO PLAIN-TEXT FORMULAS / SVG-FIRST** — Raw formula-like patterns (`a_1`, `x^2`, `a/b`, `√x`, bare `²`) in `<text>` / `<tspan>` without proper rendering are a **blocking error**. **Placing the base and exponent/subscript in separate `<text>` elements to fake sub/superscripts is FORBIDDEN.** Full rules in [`shared-standards.md §4.1`](references/shared-standards.md).
 >    - **DEFAULT: Tier B — SVG image** — ALL mathematical formulas, including simple sub/superscripts like 10², H₂O, Tₑ, MUST be rendered as SVG images via `latex_to_svg.py` and embedded as `<image>`. This is the **only** approach the AI should use unless Tier A conditions are explicitly met.
 >      ```
->      ${PYTHON} ${SKILL_DIR}/scripts/latex_to_svg.py "10^{2}" -o <project_path>/images/formula_inline_<NNN>.svg
+>      ${PYTHON} ${SKILL_DIR}/scripts/latex_to_svg.py "10^{2}" -o <project_path>/images/formula_inline_<NNN>.svg --source-file <page_or_note_file> --line-number <N> --context "<surrounding text>"
 >      ```
 >      Then embed: `<image href="../images/formula_inline_<NNN>.svg" .../>`. Counter `<NNN>` from 901.
+>      When the formula is generated ad hoc during page execution, pass `--source-file`, `--line-number`, and `--context` whenever that information is available so the SVG and `formula_manifest.json` carry the same semantic metadata as manifest-rendered formulas.
 >    - **EXCEPTION ONLY: Tier A — baseline-shift** — permitted ONLY when ALL of: (a) the expression is a single sub/superscript of 1–2 characters on a single base, (b) it appears **inline in a prose sentence** where an `<image>` element would break text flow (e.g. "扩散系数 D 的单位为 m²/s"), (c) no other formula on the same page uses Tier A (one Tier A per page maximum to keep things consistent). If in doubt, use Tier B.
 >    - **Per-page mandatory pre-scan**: before writing each page, scan ALL planned text for formula-like tokens. For each one, call `latex_to_svg.py` to generate the SVG **before** writing the page SVG. Raw patterns without `<image>` → blocking error. **Never split a formula across multiple `<text>` elements.** `svg_quality_checker.py` detects violations as **errors**.
 >    - **⛔ FORBIDDEN — formula avoidance by text substitution**: when the quality checker flags a formula violation, the ONLY acceptable fix is to **generate an SVG image** via `latex_to_svg.py`. Replacing the formula with plain-text descriptions (e.g. `φ_burst` → "破裂填充比"), removing mathematical notation (e.g. `x/y` → "x与y"), or substituting an equation with a vague label (e.g. `P = C₁ε^C₂ / (1+C₃ε^C₄)` → "四参数 S 型曲线") is **strictly forbidden**. These workarounds destroy the scientific meaning of the slide content.
@@ -159,19 +160,18 @@ After confirming the mode, proceed to Step 1.
 
 > **No source content?** When the user supplies only a topic name or requirements without any file or substantive description, run the [`topic-research`](workflows/topic-research.md) workflow first, then return here with its products as input.
 
-When the user provides non-Markdown content, convert immediately:
+> **Project-bound conversion only**: when the user provides source files (PDF / DOCX / XLSX / PPTX / EPUB / HTML / URL), do **not** run a standalone converter on the original source path. Initialize the project first, then use `project_manager.py import-sources` so every derived Markdown file, `_files/` directory, zip, and conversion report stays under the target `project/` tree instead of beside the user's original document.
 
-| User Provides | Command |
-|---------------|---------|
-| PDF file | `${PYTHON} ${SKILL_DIR}/scripts/convert_pdf.py <file>` (stable wrapper with proxy/SSL bypass + retry; falls back to `source_to_md/mineru_to_md.py` internally) |
-| DOCX / Word / Office document | `${PYTHON} ${SKILL_DIR}/scripts/source_to_md/doc_to_md.py <file>` |
-| XLSX / XLSM / Excel workbook | `${PYTHON} ${SKILL_DIR}/scripts/source_to_md/excel_to_md.py <file>` |
-| CSV / TSV | Read directly as plain-text table source |
-| PPTX / PowerPoint deck | `${PYTHON} ${SKILL_DIR}/scripts/source_to_md/ppt_to_md.py <file>` |
-| EPUB / HTML / LaTeX / RST / other | `${PYTHON} ${SKILL_DIR}/scripts/source_to_md/doc_to_md.py <file>` |
-| Web link | `${PYTHON} ${SKILL_DIR}/scripts/source_to_md/web_to_md.py <URL>` |
-| WeChat / high-security site | `${PYTHON} ${SKILL_DIR}/scripts/source_to_md/web_to_md.py <URL>` (requires `curl_cffi`, included in `requirements.txt`) |
+For source intake, use this rule:
+
+| User Provides | Step 1 action |
+|---------------|---------------|
+| PDF / DOCX / XLSX / PPTX / EPUB / HTML / LaTeX / RST / Office file | Confirm the source is present, then defer conversion to Step 2 `project_manager.py import-sources <project_path> <source_files...> --move` |
+| Web link / WeChat / high-security site | Initialize the project first, then import the URL through Step 2 `project_manager.py import-sources <project_path> <URL>` so fetched Markdown lands inside `project/sources/` |
+| CSV / TSV | Read directly as plain-text table source, or import into the project if a persisted copy is needed |
 | Markdown | Read directly |
+
+> **⛔ Intermediate-file location rule**: generated Markdown, companion `_files/` directories, MinerU zip archives, conversion reports, and any other conversion intermediates must live inside the corresponding `project/` directory. Writing them beside the user's original PDF / DOCX / PPTX / XLSX file is a workflow violation.
 
 > **Office vector assets (EMF/WMF) from DOCX/PPTX sources**:
 > `doc_to_md.py` / `ppt_to_md.py` extract embedded Office vector images (.emf/.wmf)
@@ -204,6 +204,9 @@ When the user provides non-Markdown content, convert immediately:
 >
 > Generated formula SVGs land in `images/` as `formula_*.svg` and are referenced like any other image asset: `<image href="../images/formula_001_xxx.svg" .../>`.
 > Requires `latex` and `dvisvgm` on PATH (provided by MiKTeX or TeX Live).
+> The formula manifest is the semantic source of truth: rendered SVGs receive non-visual `<title>` / `<desc>` metadata, and `stabilize_image_assets.py` writes `notes/formula_asset_table.md` with `SVG href`, LaTeX, source context, and scale guidance.
+> Executor MUST use that table before placing formula SVGs and include `data-formula-id="<id>"` on the slide `<image>`.
+> Short / inline formulas marked `inline-or-callout` or `formula-compact` must remain near text/callout scale; do not enlarge them into hero-size visuals unless the page outline explicitly makes the formula the main object.
 >
 > **Source asset inventory (mandatory)**:
 > Before Step 4, treat every extracted original asset in `<project_path>/images/` as a first-class planning input: source figures, screenshots, charts, MinerU/PDF-extracted images, EMF/WMF office vectors, and rendered `formula_*.svg` outputs. Add them to §VIII Image Resource List with source/context tags before outline decisions are locked.
@@ -232,6 +235,8 @@ Import source content (choose based on the situation):
 | User provided text directly in conversation | No import needed — content is already in conversation context; subsequent steps can reference it directly |
 
 > ⚠️ **Source document protection**: `import-sources` **always copies** original documents (PDF, DOCX, PPTX, XLSX, etc.) — even with `--move`. Only generated intermediate files (Step 1's Markdown output, `_files/` dirs) are moved. The user's original file is **never deleted or modified**.
+>
+> ⚠️ **Intermediate output location**: use `import-sources` as the default entry point for file-based sources. It writes converted Markdown, `_files/` asset directories, and reports under the project tree. Do **not** run standalone converters on the original source path unless you also pass an explicit `-o` inside `<project_path>/sources/`.
 >
 > ⚠️ **Project name collision**: if a project directory with the same name already exists, `init` automatically appends an incrementing suffix (`_2`, `_3`, ...) to create a **new** project. It **never overwrites or reuses** an existing project directory.
 
@@ -424,7 +429,7 @@ Workflow:
 1. Extract all rows with `Status: Pending` and `Acquire Via ∈ {ai, web}` from the design spec
 2. Generate prompts (ai rows) and/or run search (web rows) per [image-base.md](references/image-base.md) §2 dispatch table
 3. Verify every row reaches a terminal status: `Generated` (ai success), `Sourced` (web success), or `Needs-Manual`
-4. **Formula rendering (conditional)**: If `formula_manifest.json` exists in `images/` and contains entries with `"render": true`, run `${PYTHON} ${SKILL_DIR}/scripts/latex_to_svg.py --manifest <project_path>/images/formula_manifest.json` to generate formula SVGs
+4. **Formula rendering (conditional)**: If `formula_manifest.json` exists in `images/` and contains entries with `"render": true`, run `${PYTHON} ${SKILL_DIR}/scripts/latex_to_svg.py --manifest <project_path>/images/formula_manifest.json` to generate formula SVGs, then run `${PYTHON} ${SKILL_DIR}/scripts/stabilize_image_assets.py <project_path>` so `notes/formula_asset_table.md` reflects the rendered formulas and short-formula scale caps
 
 **✅ Checkpoint — Confirm acquisition attempted for every row**:
 ```markdown
@@ -433,6 +438,7 @@ Workflow:
 - [x] image_prompts.md sidecar rendered (when any ai rows processed)
 - [x] image_sources.json created (when any web rows processed)
 - [x] formula_manifest.json rendered (when LaTeX formulas were extracted in Step 1 and Strategist marked render=true)
+- [x] formula_asset_table.md refreshed (when formula SVGs were rendered)
 - [x] Each row: status is `Generated` / `Sourced` / `Needs-Manual` (no `Pending` remaining)
 ```
 
