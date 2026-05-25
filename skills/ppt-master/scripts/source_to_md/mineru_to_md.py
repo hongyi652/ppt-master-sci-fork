@@ -6,13 +6,13 @@ Parse a source file with MinerU, normalize the returned bundle to Markdown,
 and keep extracted images in a sibling `<output>_files/` directory.
 
 Usage:
-    python3 scripts/source_to_md/mineru_to_md.py <file.pdf> [options]
-    python3 scripts/source_to_md/mineru_to_md.py mineru_result.zip --from-zip -o output.md
+    python3 scripts/source_to_md/mineru_to_md.py <file.pdf> -o <project_path>/sources/<name>.md
+    python3 scripts/source_to_md/mineru_to_md.py mineru_result.zip --from-zip -o <project_path>/sources/<name>.md
 
 Examples:
-    python3 scripts/source_to_md/mineru_to_md.py paper.pdf
-    python3 scripts/source_to_md/mineru_to_md.py paper.pdf -o sources/paper.md --is-ocr
-    python3 scripts/source_to_md/mineru_to_md.py mineru_result.zip --from-zip -o paper.md
+    python3 scripts/source_to_md/mineru_to_md.py paper.pdf -o projects/demo/sources/paper.md
+    python3 scripts/source_to_md/mineru_to_md.py paper.pdf -o projects/demo/sources/paper.md --is-ocr
+    python3 scripts/source_to_md/mineru_to_md.py mineru_result.zip --from-zip -o projects/demo/sources/paper.md
 
 Dependencies:
     requests, Pillow
@@ -35,6 +35,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import requests
+
+from output_guard import resolve_project_bound_markdown_output
 
 try:
     from PIL import Image
@@ -553,8 +555,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     input_path = Path(args.input)
-    output_path = Path(args.output) if args.output else _default_output_path(input_path)
-    output_path = output_path.resolve()
+    try:
+        output_path = resolve_project_bound_markdown_output(input_path, args.output)
+    except ValueError as exc:
+        print(f"[ERROR] {exc}", file=sys.stderr)
+        return 1
 
     try:
         if args.from_zip or input_path.suffix.lower() == ".zip":

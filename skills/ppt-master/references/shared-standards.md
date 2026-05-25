@@ -190,6 +190,7 @@ One offending character invalidates the file and aborts export. Numeric refs (`&
 > | **Tier A — Native baseline-shift (EXCEPTION)** | Narrow exception | ONLY when ALL conditions met: (a) single sub/super of 1–2 chars, (b) inline in a prose sentence where `<image>` would break text flow, (c) max 1 Tier A per page | `<tspan baseline-shift="sub/super" font-size="70%">` inside the parent `<text>` |
 >
 > Writing a formula-like pattern as bare text (no `<image>`, no `baseline-shift`) is a **blocking error**.
+> Tier A does **not** permit separate tiny text boxes: inline unit/symbol cases like `m^-3`, `cm^-3`, `H₂O`, `Tₑ` must still remain inside a **single** parent `<text>` so PowerPoint receives one editable text frame.
 
 #### Tier B — Formula SVG Image via `latex_to_svg.py` (DEFAULT)
 
@@ -266,8 +267,10 @@ FOR each text string planned for this page:
 
 - `font-size="70%"` (or 65%–75%) is mandatory.
 - Inline tspans with `baseline-shift` must NOT carry `x`/`y`/`dy`.
+- Inline prose cases such as `cm^-3`, `m^-3`, `H₂O`, `Tₑ` must keep the whole sentence/callout in one `<text>` / one PPT text frame; only the inner `<tspan>` may differ in baseline/size.
 - Do NOT nest `baseline-shift` (no sub-of-sub) — use Tier B.
 - Unicode sub/superscript characters (`²`, `³`, `₂`, `ₑ`, etc.) are allowed as a shorthand for Tier A when coverage permits.
+- This one-text rule does **not** widen Tier A. If the expression is not clearly within the narrow inline exception, render it as Tier B SVG.
 
 #### Absolutely Forbidden Patterns (Blocking Error)
 
@@ -309,6 +312,22 @@ FOR each text string planned for this page:
 
 The same ban applies to subscripts: do NOT place a subscript character in a separate `<text>` positioned lower.
 
+❌ **FORBIDDEN** — unit/style case split across text boxes inside a sentence:
+
+```xml
+<!-- WRONG: inline unit forced into two PPT text frames -->
+<text x="420" y="260" font-size="24" fill="#333">粒子密度单位为 m</text>
+<text x="588" y="244" font-size="16" fill="#333">-3</text>
+```
+
+✅ **CORRECT — inline Tier A stays one text box**:
+
+```xml
+<text x="420" y="260" font-size="24" fill="#333">
+  粒子密度单位为 m<tspan baseline-shift="super" font-size="70%">-3</tspan>
+</text>
+```
+
 **Anti-pattern: "formula avoidance by text substitution"** — when the quality checker flags a formula violation, the AI sometimes "fixes" it by **deleting the formula and replacing it with plain Chinese/English text**. This is **strictly forbidden** — it destroys the scientific meaning of the slide content:
 
 ❌ **FORBIDDEN workarounds**:
@@ -338,7 +357,7 @@ The ONLY acceptable response to a formula violation is to call `latex_to_svg.py`
 
 These are plain text and do NOT require conversion:
 
-- **Unicode sub/superscript characters in unit/label context**: `m²`, `s⁻¹`, `cm⁻³`, `H₂O`, `CO₂` — these are **allowed as Tier A shorthand** per §4.1. The glyphs render correctly in PowerPoint. (`baseline-shift` is preferred for full coverage, but Unicode shorthand is not an error.)
+- **Unicode sub/superscript characters in unit/label context**: `m²`, `s⁻¹`, `cm⁻³`, `H₂O`, `CO₂` — these are **allowed as Tier A shorthand** per §4.1. The glyphs render correctly in PowerPoint. (`baseline-shift` is preferred for full coverage, but Unicode shorthand is not an error.) They must still live inside the same `<text>` / one PPT text frame; do not split the base and the Unicode glyphs into separate text boxes.
 - **Unit rate slashes**: `m/s`, `m²/s`, `km/h`, `steps/sec`, `steps/s`, `kg/m³`, `rad/s`, `eV/K` — these are units, not mathematical fractions.
 - **Abbreviation slashes**: `HS/VSS`, `E/B`, `AC/DC`, `TCP/IP` — alternative or paired abbreviations separated by `/`.
 - **Definition equals**: `OpenEdge = SPARTA DSMC 引擎`, `Result = 成功` — the `=` sign used as a natural-language equivalence or definition (left side is a long name, not a 1–3 char math variable).
@@ -350,7 +369,7 @@ These are plain text and do NOT require conversion:
 
 #### Quality Gate
 
-`svg_quality_checker.py` detects raw plain-text formula patterns (underscore notation `a_1`, caret notation `x^2`, fraction slashes between math variables `ΔT/Δt`, short-variable equations `E=mc²`, radicals, and integral/summation with limits) in `<text>` / `<tspan>` content and reports them as **errors** (not warnings). The following are NOT flagged: Unicode sub/superscript characters (allowed as shorthand), abbreviation slashes (`HS/VSS`, `E/B`), unit rates (`m/s`, `steps/sec`), and long-name definitions. Properly marked `<tspan baseline-shift="sub/super">` elements are also NOT flagged.
+`svg_quality_checker.py` detects raw plain-text formula patterns (underscore notation `a_1`, caret notation `x^2`, fraction slashes between math variables `ΔT/Δt`, short-variable equations `E=mc²`, radicals, and integral/summation with limits) in `<text>` / `<tspan>` content and reports them as **errors** (not warnings). It also treats split fake sub/superscripts such as separate `m` + `-3` or `H` + `2` text boxes as **errors**. The following are NOT flagged: Unicode sub/superscript characters (allowed as shorthand), abbreviation slashes (`HS/VSS`, `E/B`), unit rates (`m/s`, `steps/sec`), and long-name definitions. Properly marked `<tspan baseline-shift="sub/super">` elements are also NOT flagged.
 
 ### Inline Text Runs (Single Logical Line = Single `<text>`)
 

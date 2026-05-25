@@ -1237,8 +1237,9 @@ class SVGQualityChecker:
         """Detect adjacent <text> elements faking sub/superscripts.
 
         Anti-pattern: placing "10" as one <text> and "2" as a separate
-        smaller <text> positioned higher to visually approximate 10².
-        This always causes spacing drift in PowerPoint.
+        smaller <text> positioned higher to visually approximate 10², or
+        placing "m" and "-3" in separate text boxes to fake m^-3 inside
+        running prose. This always causes spacing drift in PowerPoint.
         """
         try:
             root = ET.fromstring(content)
@@ -1289,33 +1290,52 @@ class SVGQualityChecker:
         if len(text_elems) < 2:
             return
 
-        # Check every pair: one short text (1-3 chars) near a longer text,
-        # with smaller font-size and vertical offset → likely fake sub/super.
+        def _approx_text_width(text: str, font_size: float) -> float:
+            width_units = 0.0
+            for char in text:
+                if char.isspace():
+                    width_units += 0.35
+                elif ord(char) > 127:
+                    width_units += 1.0
+                elif char.isalpha():
+                    width_units += 0.65
+                elif char.isdigit():
+                    width_units += 0.6
+                else:
+                    width_units += 0.45
+            return width_units * font_size
+
+        # Check every pair: a smaller text (1-3 chars) near the right edge of
+        # a larger text, with vertical offset → likely fake sub/super.
+        # The base is determined by font-size, not text length, so short-base
+        # cases like "m" + "-3" and "cm" + "-3" are also caught.
         for i, a in enumerate(text_elems):
             for b in text_elems[i + 1:]:
-                # Identify which is the "short" (potential exponent) and which
-                # is the "base".
-                if a['len'] <= 3 and b['len'] > a['len']:
-                    short, base = a, b
-                elif b['len'] <= 3 and a['len'] > b['len']:
-                    short, base = b, a
-                else:
-                    continue
-
                 # Skip if either has zero font-size (unknown)
-                if short['fs'] <= 0 or base['fs'] <= 0:
+                if a['fs'] <= 0 or b['fs'] <= 0:
                     continue
 
-                # The short element must be noticeably smaller
-                if short['fs'] >= base['fs'] * 0.9:
+                if a['fs'] > b['fs']:
+                    base, short = a, b
+                else:
+                    base, short = b, a
+
+                # The exponent/subscript candidate must stay short.
+                if short['len'] > 3:
+                    continue
+
+                # The short element must be noticeably smaller.
+                if base['fs'] <= short['fs'] * 1.1:
                     continue
 
                 # Must be horizontally close — the short text should be near
                 # the right edge of the base.  Approximate base width.
-                approx_base_width = base['len'] * base['fs'] * 0.6
+                approx_base_width = _approx_text_width(base['text'], base['fs'])
                 dx = short['x'] - (base['x'] + approx_base_width)
-                # Allow small gap or slight overlap
-                if dx < -base['fs'] * 0.5 or dx > base['fs'] * 1.5:
+                # Allow moderate overlap or a modest gap. Sentence-tail cases
+                # such as "粒子密度单位为 m" + "-3" often overlap the final base
+                # glyph slightly when the exponent is nudged upward.
+                if dx < -base['fs'] * 1.5 or dx > base['fs'] * 3.0:
                     continue
 
                 # Must be vertically offset (superscript = higher = smaller y;
@@ -1329,9 +1349,11 @@ class SVGQualityChecker:
                     f"Fake sub/superscript detected: \"{base['text']}\" "
                     f"(font-size {base['fs']}) + \"{short['text']}\" "
                     f"(font-size {short['fs']}) are separate <text> elements "
-                    f"positioned to fake a formula. Use <tspan baseline-shift="
-                    f"\"super/sub\" font-size=\"70%\"> inside a single <text> "
-                    f"(Tier A) or latex_to_svg.py (Tier B) per Iron Rule §4.1"
+                    f"positioned to fake a superscript/subscript. Keep the "
+                    f"whole phrase in one <text> / one PPT text frame, using "
+                    f"<tspan baseline-shift=\"super/sub\" font-size=\"70%\"> "
+                    f"for the narrow Tier A case, or latex_to_svg.py for Tier B. "
+                    f"Do not keep separate text boxes and tweak x/y during QC repair."
                 )
 
     def _check_split_sentence(self, content: str, result: Dict):

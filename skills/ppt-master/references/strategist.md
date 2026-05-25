@@ -241,6 +241,14 @@ Baseline choice follows **content density**, not style. Common: `18px` (dense) /
 
 > Two baseline columns are illustrative only — for any other baseline (16/20/22/28/32…), multiply the row's ratio. Checker reads live `body` from `spec_lock.md`. Executor may pick any px within a role's band without pre-declaring; values outside **every** band require lock extension first.
 
+#### g.1 Inline superscript/subscript planning (hard rule)
+
+When a page needs inline unit/symbol superscript or subscript inside running prose or a callout, for example `m^-3`, `cm^-3`, `H₂O`, `Tₑ`, do **not** plan it as multiple micro text boxes with manual font scaling/offset. The layout intent must be one editable line: either a single text run with inline superscript/subscript in the narrow Tier A case, or a formula SVG in Tier B.
+
+- Strategist must assume **one sentence / one text frame** for these cases.
+- Do not use tiny floating exponent/subscript boxes as a spacing tactic in §IX page outline descriptions.
+- This rule does **not** loosen the SVG-first formula policy. It only forbids the split-text-box workaround for inline prose cases.
+
 ### h. Image Usage Confirmation
 
 | Option | Approach | Suitable Scenarios |

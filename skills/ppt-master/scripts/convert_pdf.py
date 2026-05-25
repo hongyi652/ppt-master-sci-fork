@@ -45,6 +45,7 @@ from mineru_to_md import (  # noqa: E402
     convert_with_mineru,
     normalize_mineru_zip,
 )
+from output_guard import resolve_project_bound_markdown_output  # noqa: E402
 
 DEFAULT_RETRIES = 2
 DEFAULT_RETRY_DELAY_SECONDS = 5.0
@@ -78,14 +79,6 @@ def _setup_proxy_bypass() -> list[str]:
 def _collect_proxy_snapshot() -> dict[str, str]:
     """Snapshot current proxy env vars for the report."""
     return {key: os.environ.get(key, "") for key in PROXY_ENV_KEYS if os.environ.get(key)}
-
-
-def _find_project_root(path: Path) -> Path | None:
-    """Return the nearest enclosing project directory when one exists."""
-    for parent in path.resolve().parents:
-        if (parent / "sources").is_dir() and (parent / "notes").is_dir():
-            return parent
-    return None
 
 
 # ------------------------------------------------------------------
@@ -290,19 +283,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[ERROR] File not found: {input_path}", file=sys.stderr)
         return 1
 
-    if args.output:
-        output_path = Path(args.output)
-    else:
-        if _find_project_root(input_path) is None:
-            print(
-                "[ERROR] Refusing to write conversion artifacts next to the original source file. "
-                "Create the project first and use project_manager.py import-sources, or pass "
-                "-o <project_path>/sources/<name>.md explicitly.",
-                file=sys.stderr,
-            )
-            return 1
-        output_path = input_path.with_suffix(".md")
-    output_path = output_path.resolve()
+    try:
+        output_path = resolve_project_bound_markdown_output(input_path, args.output)
+    except ValueError as exc:
+        print(f"[ERROR] {exc}", file=sys.stderr)
+        return 1
     report_path = output_path.with_suffix(".convert_report.json")
 
     # --- proxy setup ---

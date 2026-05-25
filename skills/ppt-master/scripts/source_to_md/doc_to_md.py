@@ -14,6 +14,9 @@ Fallback formats (require pandoc installed):
 All paths produce the same output convention:
     <input>.md                     Markdown file
     <input>_files/<asset>          Extracted media (relative references in MD)
+
+Use these low-level converters with `-o <project_path>/sources/<name>.md` so
+all derived Markdown and extracted media stay inside the target project tree.
 """
 
 import argparse
@@ -30,6 +33,8 @@ import zipfile
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 from xml.etree import ElementTree as ET
+
+from output_guard import resolve_project_bound_markdown_output
 
 # ─────────────────────────────────────────────────────────────
 # Format registry
@@ -800,7 +805,11 @@ def convert_to_markdown(input_path: str, output_path: str | None = None) -> str:
         print(f"   Supported: {supported}")
         return ""
 
-    out_file = Path(output_path) if output_path else input_file.with_suffix(".md")
+    try:
+        out_file = resolve_project_bound_markdown_output(input_file, output_path)
+    except ValueError as exc:
+        print(f"[ERROR] {exc}")
+        return ""
     out_file.parent.mkdir(parents=True, exist_ok=True)
 
     if suffix in NATIVE_FORMATS:
@@ -827,11 +836,11 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python doc_to_md.py lecture.docx                # Word → Markdown (mammoth)
-  python doc_to_md.py article.html                # HTML → Markdown (markdownify)
-  python doc_to_md.py book.epub                   # EPUB → Markdown (ebooklib)
-  python doc_to_md.py notebook.ipynb              # Jupyter → Markdown (nbconvert)
-  python doc_to_md.py manuscript.tex              # LaTeX → Markdown (pandoc fallback)
+    python doc_to_md.py lecture.docx -o projects/demo/sources/lecture.md
+    python doc_to_md.py article.html -o projects/demo/sources/article.md
+    python doc_to_md.py book.epub -o projects/demo/sources/book.md
+    python doc_to_md.py notebook.ipynb -o projects/demo/sources/notebook.md
+    python doc_to_md.py manuscript.tex -o projects/demo/sources/manuscript.md
 
 Native formats (no pandoc required):
   .docx  .html/.htm  .epub  .ipynb

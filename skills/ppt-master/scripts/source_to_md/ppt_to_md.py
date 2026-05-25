@@ -7,6 +7,9 @@ Open XML PowerPoint files into Markdown.
 
 Primary use case: PPTX source decks -> Markdown for PPT generation input.
 
+Use `-o <project_path>/sources/<name>.md` or `-o <project_path>/sources/` so
+Markdown, extracted media, and manifests stay inside the target project tree.
+
 Dependency:
     pip install python-pptx
 """
@@ -22,6 +25,11 @@ import sys
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
+
+from output_guard import (
+    resolve_project_bound_directory,
+    resolve_project_bound_markdown_output,
+)
 
 from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
@@ -447,10 +455,11 @@ def convert_presentation_to_markdown(
 
     print(f"[INFO] Converting {SUPPORTED_FORMATS[suffix]}: {input_file.name}")
 
-    if output_path:
-        out_file = Path(output_path)
-    else:
-        out_file = input_file.with_suffix(".md")
+    try:
+        out_file = resolve_project_bound_markdown_output(input_file, output_path)
+    except ValueError as exc:
+        print(f"[ERROR] {exc}")
+        return ""
 
     out_file.parent.mkdir(parents=True, exist_ok=True)
     asset_dir = out_file.parent / f"{out_file.stem}_files"
@@ -571,10 +580,11 @@ def process_directory(input_dir: str, output_dir: str | None = None) -> None:
     """Convert all supported PowerPoint files in a directory to Markdown."""
     input_path = Path(input_dir)
 
-    if output_dir:
-        output_path = Path(output_dir)
-    else:
-        output_path = input_path
+    try:
+        output_path = resolve_project_bound_directory(input_path, output_dir)
+    except ValueError as exc:
+        print(f"[ERROR] {exc}")
+        return
 
     presentation_files = sorted(
         path for path in input_path.iterdir()
@@ -598,11 +608,9 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python ppt_to_md.py slides.pptx
-  python ppt_to_md.py slides.pptx -o output.md
-  python ppt_to_md.py ./decks
-  python ppt_to_md.py ./decks -o ./markdown
-  python ppt_to_md.py deck.ppsx -o notes/deck.md
+    python ppt_to_md.py slides.pptx -o projects/demo/sources/slides.md
+    python ppt_to_md.py deck.ppsx -o projects/demo/sources/deck.md
+    python ppt_to_md.py ./decks -o projects/demo/sources
 
 Supported formats:
   .pptx  .pptm  .ppsx  .ppsm  .potx  .potm
@@ -617,8 +625,7 @@ Legacy .ppt is not parsed directly. Resave it as .pptx or export it to PDF first
     input_path = Path(args.input)
 
     if input_path.is_file():
-        output = args.output or str(input_path.with_suffix(".md"))
-        result = convert_presentation_to_markdown(str(input_path), output)
+        result = convert_presentation_to_markdown(str(input_path), args.output)
         sys.exit(0 if result else 1)
     if input_path.is_dir():
         process_directory(str(input_path), args.output)

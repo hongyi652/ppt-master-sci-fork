@@ -11,6 +11,9 @@ Unsupported by default:
 
 All paths produce the same output convention:
     <input>.md                     Markdown file
+
+Use `-o <project_path>/sources/<name>.md` so the generated Markdown stays in
+the target project tree instead of beside the original workbook.
 """
 
 import argparse
@@ -19,6 +22,8 @@ import sys
 from datetime import date, datetime, time
 from pathlib import Path
 from typing import Any
+
+from output_guard import resolve_project_bound_markdown_output
 
 
 # ─────────────────────────────────────────────────────────────
@@ -325,7 +330,11 @@ def convert_to_markdown(
         print("[ERROR] --max-rows and --max-cols must be zero or positive integers")
         return ""
 
-    out_file = Path(output_path) if output_path else input_file.with_suffix(".md")
+    try:
+        out_file = resolve_project_bound_markdown_output(input_file, output_path)
+    except ValueError as exc:
+        print(f"[ERROR] {exc}")
+        return ""
     out_file.parent.mkdir(parents=True, exist_ok=True)
 
     print(f"[INFO] Converting Excel workbook: {input_file.name}")
@@ -338,9 +347,9 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python excel_to_md.py report.xlsx
-  python excel_to_md.py report.xlsx -o output.md
-  python excel_to_md.py report.xlsm --max-rows 200 --max-cols 40
+    python excel_to_md.py report.xlsx -o projects/demo/sources/report.md
+    python excel_to_md.py report.xlsx -o projects/demo/sources/report.md --max-rows 200
+    python excel_to_md.py report.xlsm -o projects/demo/sources/report.md --max-cols 40
 
 Supported formats:
   .xlsx  .xlsm

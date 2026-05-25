@@ -4,10 +4,10 @@
 web_to_md.py - Web Page to Markdown Converter (Python Version)
 
 Usage:
-    python scripts/source_to_md/web_to_md.py <url>
-    python scripts/source_to_md/web_to_md.py <url1> <url2> ...
+    python scripts/source_to_md/web_to_md.py <url> -o <project_path>/sources/<name>.md
+    python scripts/source_to_md/web_to_md.py <url1> <url2> ... -d <project_path>/sources
     python scripts/source_to_md/web_to_md.py -f urls.txt
-    python scripts/source_to_md/web_to_md.py <url> -o output.md
+    python scripts/source_to_md/web_to_md.py <url> -o <project_path>/sources/output.md
 
 Dependencies:
     pip install requests beautifulsoup4
@@ -34,6 +34,11 @@ import re
 import sys
 import time
 from urllib.parse import urljoin, urlparse
+
+from output_guard import (
+    ensure_project_bound_directory,
+    ensure_project_bound_output_path,
+)
 
 try:
     import requests
@@ -757,9 +762,6 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    if args.dir:
-        CONFIG["output_dir"] = args.dir
-
     targets = []
     if args.urls:
         targets.extend(args.urls)
@@ -776,6 +778,26 @@ def main() -> None:
     if not targets:
         parser.print_help()
         sys.exit(0)
+
+    if len(targets) == 1 and args.output:
+        try:
+            args.output = str(ensure_project_bound_output_path(args.output))
+        except ValueError as exc:
+            print(f"Error: {exc}")
+            sys.exit(1)
+    elif args.dir:
+        try:
+            CONFIG["output_dir"] = str(ensure_project_bound_directory(args.dir))
+        except ValueError as exc:
+            print(f"Error: {exc}")
+            sys.exit(1)
+    else:
+        print(
+            "Error: Refusing to write fetched Markdown outside a project tree. "
+            "Use project_manager.py import-sources <project_path> <URL>, or pass "
+            "-o/-d inside <project_path>/sources.",
+        )
+        sys.exit(1)
 
     results = []
     for i, url in enumerate(targets):
