@@ -48,6 +48,10 @@ Behavior:
 - Default output (default-flow mode, no `-o`):
   - `exports/<project_name>_<timestamp>.pptx` — native editable pptx (canonical output)
   - `backup/<timestamp>/svg_output/` — copy of Executor SVG source, always written so the pptx can be rebuilt via `finalize_svg → svg_to_pptx` without re-running the LLM
+  - `PPTX_OUTPUT_DIR=<absolute exports directory>` and
+    `PPTX_OUTPUT_FILE=<absolute canonical pptx path>` are printed after successful export
+  - The primary PPTX opens automatically with the platform default application;
+    pass `--no-open` to suppress it
 - `--svg-snapshot` (opt-in) additionally emits:
   - `exports/<project_name>_<timestamp>_svg.pptx` — SVG snapshot pptx for visual reference, sibling of the native pptx
   - Live preview already serves as the SVG visual reference for day-to-day use; the snapshot pptx is for distribution or frozen-state archival

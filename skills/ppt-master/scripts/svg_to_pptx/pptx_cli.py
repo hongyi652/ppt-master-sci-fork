@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-import sys
-import shutil
 import argparse
+import os
+import shutil
+import subprocess
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -23,6 +25,56 @@ except ImportError:
 
 def _as_dict(value: object) -> dict:
     return value if isinstance(value, dict) else {}
+
+
+def _resolve_output_path(path: Path) -> Path:
+    """Resolve an output path for user-facing logs."""
+    try:
+        return path.resolve()
+    except OSError:
+        return path.absolute()
+
+
+def _open_with_default_app(path: Path) -> bool:
+    """Open a generated file with the platform default application."""
+    resolved_path = _resolve_output_path(path)
+    try:
+        if sys.platform.startswith('win'):
+            startfile = getattr(os, 'startfile')
+            startfile(str(resolved_path))
+        elif sys.platform == 'darwin':
+            subprocess.Popen(
+                ['open', str(resolved_path)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        else:
+            subprocess.Popen(
+                ['xdg-open', str(resolved_path)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+    except Exception as exc:
+        print(f"  [warn] PPTX auto-open skipped: {exc}", file=sys.stderr)
+        return False
+    return True
+
+
+def _print_export_summary(generated_paths: list[Path], opened_path: Path | None) -> None:
+    """Print stable absolute PPTX output markers."""
+    if not generated_paths:
+        return
+
+    resolved_paths = [_resolve_output_path(path) for path in generated_paths]
+    primary_path = resolved_paths[0]
+    print(f"PPTX_OUTPUT_DIR={primary_path.parent}")
+    print(f"PPTX_OUTPUT_FILE={primary_path}")
+    if len(resolved_paths) > 1:
+        print("PPTX_OUTPUT_FILES:")
+        for path in resolved_paths:
+            print(f"  {path}")
+    if opened_path is not None:
+        print(f"PPTX_OPENED={_resolve_output_path(opened_path)}")
 
 
 def _recorded_narration_on_click_slides(
@@ -145,6 +197,8 @@ Recorded narration:
                         choices=list(CANVAS_FORMATS.keys()), default=None,
                         help='Specify canvas format')
     parser.add_argument('-q', '--quiet', action='store_true', help='Quiet mode')
+    parser.add_argument('--no-open', action='store_true',
+                        help='Do not automatically open the primary generated PPTX after successful export')
 
     parser.add_argument('--no-compat', action='store_true',
                         help='Disable Office compatibility mode (pure SVG only, requires Office 2019+)')
@@ -508,6 +562,7 @@ Recorded narration:
     )
 
     success = True
+    generated_pptx_paths: list[Path] = []
 
     # --- Native shapes version (primary) ---
     if gen_native:
@@ -530,6 +585,8 @@ Recorded narration:
             **shared_kwargs,
         )
         success = success and ok
+        if ok:
+            generated_pptx_paths.append(native_path)
 
     # --- SVG image reference version ---
     if gen_legacy:
@@ -551,6 +608,8 @@ Recorded narration:
             **shared_kwargs,
         )
         success = success and ok
+        if ok and legacy_path is not None:
+            generated_pptx_paths.append(legacy_path)
 
     # svg_output/ snapshot — runs once per export in default-flow mode,
     # decoupled from --svg-snapshot. Preserves the AI-generated SVG sources
@@ -579,5 +638,12 @@ Recorded narration:
         except Exception as exc:
             if verbose:
                 print(f"  [warn] cache cleanup skipped: {exc}")
+
+    opened_pptx_path: Path | None = None
+    if success and generated_pptx_paths:
+        primary_pptx_path = generated_pptx_paths[0]
+        if not args.no_open and _open_with_default_app(primary_pptx_path):
+            opened_pptx_path = primary_pptx_path
+        _print_export_summary(generated_pptx_paths, opened_pptx_path)
 
     sys.exit(0 if success else 1)

@@ -540,9 +540,13 @@ ${PYTHON} ${SKILL_DIR}/scripts/svg_to_pptx.py <project_path>
 # Output (default-flow mode):
 #   exports/<project_name>_<timestamp>.pptx           ← native pptx (canonical output, reads svg_output/)
 #   backup/<timestamp>/svg_output/                    ← Executor SVG source backup (always written)
+#   PPTX_OUTPUT_DIR=<absolute exports directory>      printed after successful export
+#   PPTX_OUTPUT_FILE=<absolute canonical pptx path>   printed after successful export
+#   PPTX_OPENED=<absolute canonical pptx path>        printed after auto-open succeeds
 #
 # Add --svg-snapshot to additionally emit the SVG-image preview pptx alongside the native pptx:
 #   exports/<project_name>_<timestamp>_svg.pptx      ← SVG preview pptx (reads svg_final/)
+# The primary PPTX opens automatically after successful export; pass --no-open to suppress.
 ```
 
 > The native pptx consumes `svg_output/` directly so the converter can preserve
