@@ -7,7 +7,7 @@ PPT Master's exported PPTX supports **page transitions** (slide-to-slide) and **
 | Layer | Default | Why |
 |---|---|---|
 | Page transition | `none` | Avoid adding slide-to-slide motion unless the user explicitly asks for it |
-| Per-element animation | `auto` effect + `after-previous` trigger, 0.4s duration + 0.5s stagger | Effects are mapped from group id (chart→wipe, card-/step-/pillar-→fly, title/takeaway→fade); image-like ids (`hero` / `figure-` / `image` / `img-` / `kpi`) cycle a richer visual pool (zoom / dissolve / circle / box / diamond / wheel) so multiple images vary across the deck; unmatched ids cycle a small fade/wipe/fly/zoom pool. Cascades automatically on slide entry — zero interaction |
+| Per-element animation | `none` (off by default) | Only enabled when the user explicitly asks for entrance/element animation |
 
 To regenerate a deck with different settings, rerun `svg_to_pptx.py` against the same `svg_output/` (or `svg_final/`) — no need to rerun the LLM. Slide transitions stay off unless you pass `-t <effect>` or set `defaults.transition.effect` in `animations.json`. To turn per-element animation off entirely, pass `-a none`.
 
@@ -79,14 +79,14 @@ Flags:
 
 ## Per-Element Animations
 
-Enabled by default (`auto` effect + `after-previous` trigger). Three Start modes are available — these mirror PowerPoint's animation-pane "Start" dropdown:
+Disabled by default (`-a none`). Three Start modes are available — these mirror PowerPoint's animation-pane "Start" dropdown:
 
 - **`on-click`** — entering a slide → first click reveals the first semantic group; each subsequent click reveals the next group in z-order. Suits live presentations where the speaker paces reveals. Forbidden with `--recorded-narration` because video-ready exports need click-free playback.
 - **`with-previous`** — all groups start together on slide entry, playing their entrance animation in parallel. Stagger ignored.
 - **`after-previous`** (default) — first group fires on slide entry, subsequent groups cascade after the previous one finishes, with `--animation-stagger` extra spacing. Suits kiosk playback, recorded walkthroughs, or anyone who wants visual flow without clicking.
 
 ```bash
-# Default behavior (no flags needed): auto effect + after-previous cascade
+# Default behavior: `-a none` (no per-element animation)
 python3 skills/ppt-master/scripts/svg_to_pptx.py <project>
 
 # Disable per-element animation entirely

@@ -33,6 +33,12 @@ import urllib.error
 import urllib.request
 import webbrowser
 import xml.etree.ElementTree as ET
+
+# Register SVG-related namespaces so ET.tostring() preserves standard
+# prefixes (xlink) and uses the default SVG namespace (no svg: prefix).
+ET.register_namespace('xlink', 'http://www.w3.org/1999/xlink')
+ET.register_namespace('', 'http://www.w3.org/2000/svg')
+
 from pathlib import Path
 from typing import Optional
 
