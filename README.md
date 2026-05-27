@@ -175,7 +175,7 @@ PPT Master runs in **any tool with agent capability** — read/write files, exec
 
 ```bash
 git clone https://github.com/hongyi652/ppt-master-sci-fork.git
-cd ppt-master
+cd ppt-master-sci-fork
 ```
 
 Then install dependencies:
