@@ -174,7 +174,7 @@ PPT Master runs in **any tool with agent capability** — read/write files, exec
 **Option B — Git clone** (requires [Git](https://git-scm.com/downloads) installed):
 
 ```bash
-git clone https://github.com/hugohe3/ppt-master.git
+git clone https://github.com/hongyi652/ppt-master-sci-fork.git
 cd ppt-master
 ```
 
