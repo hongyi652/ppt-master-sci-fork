@@ -13,6 +13,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import preflight_check  # noqa: E402
+from formula_display_policy import minimum_formula_display_floor  # noqa: E402
 from project_manager import ProjectManager  # noqa: E402
 from svg_finalize.align_embed_images import align_and_embed_images_in_svg  # noqa: E402
 from svg_quality_checker import SVGQualityChecker  # noqa: E402
@@ -103,6 +104,155 @@ class ImageFinalizeTests(unittest.TestCase):
 
 @unittest.skipIf(Image is None, "Pillow is required for image resolution checks")
 class SVGQualityCheckerTests(unittest.TestCase):
+    def test_short_formula_floor_allows_some_room_below_recommended(self) -> None:
+        floor = minimum_formula_display_floor(
+            100,
+            20,
+            1160,
+            600,
+            latex="n_e = 10^{19}",
+            display=False,
+        )
+
+        self.assertEqual(floor["recommended_display_h"], 48)
+        self.assertEqual(floor["min_display_h"], 17)
+
+    def test_inline_formula_at_17px_does_not_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            work_dir = Path(tmp)
+            images_dir = work_dir / "images"
+            images_dir.mkdir()
+            formula_path = work_dir / "formula.svg"
+            formula_path.write_text(
+                '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="20">'
+                '<path d="M0 0H100V20H0Z"/></svg>',
+                encoding="utf-8",
+            )
+            (images_dir / "formula_manifest.json").write_text(
+                '{"formulas": [{"id": "eq01", "svg_path": "images/formula.svg", '
+                '"svg_width": 100, "svg_height": 20, "latex": "n_e", '
+                '"display": false}]}',
+                encoding="utf-8",
+            )
+            svg_path = work_dir / "slide.svg"
+            svg_path.write_text(
+                '<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" '
+                'viewBox="0 0 1280 720">'
+                '<image href="formula.svg" x="0" y="0" width="85" height="17" '
+                'data-formula-id="eq01" preserveAspectRatio="xMidYMid meet"/>'
+                '</svg>',
+                encoding="utf-8",
+            )
+
+            result = SVGQualityChecker(template_mode=True).check_file(str(svg_path))
+
+            self.assertFalse(
+                any("below the readable minimum" in error for error in result["errors"]),
+                result["errors"],
+            )
+
+    def test_inline_formula_below_17px_still_errors(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            work_dir = Path(tmp)
+            images_dir = work_dir / "images"
+            images_dir.mkdir()
+            formula_path = work_dir / "formula.svg"
+            formula_path.write_text(
+                '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="20">'
+                '<path d="M0 0H100V20H0Z"/></svg>',
+                encoding="utf-8",
+            )
+            (images_dir / "formula_manifest.json").write_text(
+                '{"formulas": [{"id": "eq01", "svg_path": "images/formula.svg", '
+                '"svg_width": 100, "svg_height": 20, "latex": "n_e", '
+                '"display": false}]}',
+                encoding="utf-8",
+            )
+            svg_path = work_dir / "slide.svg"
+            svg_path.write_text(
+                '<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" '
+                'viewBox="0 0 1280 720">'
+                '<image href="formula.svg" x="0" y="0" width="80" height="16" '
+                'data-formula-id="eq01" preserveAspectRatio="xMidYMid meet"/>'
+                '</svg>',
+                encoding="utf-8",
+            )
+
+            result = SVGQualityChecker(template_mode=True).check_file(str(svg_path))
+
+            self.assertTrue(
+                any("below the readable minimum" in error for error in result["errors"]),
+                result["errors"],
+            )
+
+    def test_compact_formula_borderline_size_no_longer_errors(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            work_dir = Path(tmp)
+            images_dir = work_dir / "images"
+            images_dir.mkdir()
+            formula_path = work_dir / "formula.svg"
+            formula_path.write_text(
+                '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="20">'
+                '<path d="M0 0H100V20H0Z"/></svg>',
+                encoding="utf-8",
+            )
+            (images_dir / "formula_manifest.json").write_text(
+                '{"formulas": [{"id": "eq01", "svg_path": "images/formula.svg", '
+                '"svg_width": 100, "svg_height": 20, "latex": "a_1+a_2+a_3+a_4+a_5+a_6+a_7+a_8+a_9+a_10=a_total", '
+                '"display": true}]}',
+                encoding="utf-8",
+            )
+            svg_path = work_dir / "slide.svg"
+            svg_path.write_text(
+                '<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" '
+                'viewBox="0 0 1280 720">'
+                '<image href="formula.svg" x="0" y="0" width="200" height="40" '
+                'data-formula-id="eq01" preserveAspectRatio="xMidYMid meet"/>'
+                '</svg>',
+                encoding="utf-8",
+            )
+
+            result = SVGQualityChecker(template_mode=True).check_file(str(svg_path))
+
+            self.assertFalse(
+                any("below the readable minimum" in error for error in result["errors"]),
+                result["errors"],
+            )
+
+    def test_compact_formula_still_errors_when_clearly_too_small(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            work_dir = Path(tmp)
+            images_dir = work_dir / "images"
+            images_dir.mkdir()
+            formula_path = work_dir / "formula.svg"
+            formula_path.write_text(
+                '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="20">'
+                '<path d="M0 0H100V20H0Z"/></svg>',
+                encoding="utf-8",
+            )
+            (images_dir / "formula_manifest.json").write_text(
+                '{"formulas": [{"id": "eq01", "svg_path": "images/formula.svg", '
+                '"svg_width": 100, "svg_height": 20, "latex": "a_1+a_2+a_3+a_4+a_5+a_6+a_7+a_8+a_9+a_10=a_total", '
+                '"display": true}]}',
+                encoding="utf-8",
+            )
+            svg_path = work_dir / "slide.svg"
+            svg_path.write_text(
+                '<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" '
+                'viewBox="0 0 1280 720">'
+                '<image href="formula.svg" x="0" y="0" width="150" height="30" '
+                'data-formula-id="eq01" preserveAspectRatio="xMidYMid meet"/>'
+                '</svg>',
+                encoding="utf-8",
+            )
+
+            result = SVGQualityChecker(template_mode=True).check_file(str(svg_path))
+
+            self.assertTrue(
+                any("below the readable minimum" in error for error in result["errors"]),
+                result["errors"],
+            )
+
     def test_meet_mode_uses_fitted_size_for_blurry_warning(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             work_dir = Path(tmp)

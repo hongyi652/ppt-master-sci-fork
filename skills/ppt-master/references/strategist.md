@@ -22,9 +22,20 @@ As a top-tier AI presentation strategist, receive source documents, perform cont
 
 🚧 **GATE — Mandatory read first**: `read_file templates/design_spec_reference.md` before any analysis or writing. The design_spec.md output MUST follow that template's 11-section structure exactly. After writing, self-check each section is present: I Project Info → II Canvas → III Visual Theme → IV Typography → V Layout → VI Icon → VII Visualization → VIII Image → IX Outline → X Speaker Notes → XI Tech Constraints.
 
-⛔ **BLOCKING (120-second fallback enabled)**: After the read, present professional recommendations for the eight items below as a bundled package and wait for explicit user confirmation. If the user does not respond within 120 seconds, lock the recommended values, explicitly state that the timeout fallback was applied, and continue.
+**Mode rule**:
+- **One-click mode**: do NOT ask for deck-copy language and do NOT wait for Eight Confirmations. Generate the recommended language and eight decisions, state that one-click mode auto-locked them, then write `design_spec.md` and `spec_lock.md`.
+- **Step-by-step mode**: ⛔ **BLOCKING (120-second fallback enabled)** — after the read, present professional recommendations for the eight items below as a bundled package and wait for explicit user confirmation. If the user does not respond within 120 seconds, lock the recommended values, explicitly state that the timeout fallback was applied, and continue.
 
-> **Execution discipline**: This is the last BLOCKING checkpoint in the pipeline. After user confirmation or the 120-second timeout fallback, complete the Design Spec and proceed to image generation / SVG / post-processing without further pauses.
+> **Execution discipline**: This is the last confirmation checkpoint in the pipeline. After one-click auto-lock, user confirmation, or the 120-second timeout fallback, complete the Design Spec and proceed to image generation / SVG / post-processing without further pauses.
+
+### Split-mode signal table
+
+Use this table when writing the mandatory split-mode note described in `SKILL.md` Step 4.
+
+| Phase A signal | Note variant |
+|---|---|
+| Long recommended page count, bulky source Markdown, long `formula_manifest.json`, many source images, or heavy topic-research fetches | Heavy — recommend [`resume-execute`](../workflows/resume-execute.md) after Step 5 because Phase B frees Executor context |
+| None of the above | Normal — continuous mode is acceptable; mention split-mode remains available |
 
 ### a. Canvas Format Confirmation
 
@@ -38,11 +49,11 @@ Provide specific page count recommendation based on source document content volu
 
 Confirm target audience, usage occasion, core message, and **deck text language**; provide initial assessment based on document nature.
 
-> **Language is mandatory — ASK FIRST**: before presenting the rest of the Eight Confirmations bundle, Strategist MUST proactively ask the user: "PPT 正文使用什么语言？" (or the equivalent in the conversation language). This is the very first question; do not skip it, do not infer solely from chat language. Record the confirmed language in `design_spec.md §I Project Information` and `spec_lock.md` as the execution truth.
+> **Language is mandatory — ASK FIRST in Step-by-step mode**: before presenting the rest of the Eight Confirmations bundle, Strategist MUST proactively ask the user: "PPT 正文使用什么语言？" (or the equivalent in the conversation language). This is the very first Step-by-step question. In One-click mode, do not ask; auto-lock the recommended language and record it in `design_spec.md §I Project Information` and `spec_lock.md` as the execution truth.
 
 **Default recommendation**: when the user has not named a deck language, recommend `zh-CN` as the default option. Record another language only when the user explicitly chooses it or the source task clearly requires it.
 
-**Timed fallback**: this language question is timeout-enabled. After presenting the options and the recommendation, wait up to 120 seconds. If the user does not answer, lock the recommended language and explicitly state that the timeout fallback was applied before continuing to the remaining seven items.
+**Timed fallback**: in Step-by-step mode, this language question is timeout-enabled. After presenting the options and the recommendation, wait up to 120 seconds. If the user does not answer, lock the recommended language and explicitly state that the timeout fallback was applied before continuing to the remaining seven items. In One-click mode, skip the timeout and auto-lock immediately.
 
 ### d. Style Objective Confirmation
 

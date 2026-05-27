@@ -5,9 +5,18 @@ import re
 
 SHORT_FORMULA_MIN_HEIGHT = 28
 SHORT_FORMULA_MAX_HEIGHT = 48
+SHORT_FORMULA_ERROR_MIN_HEIGHT = 17
 MEDIUM_FORMULA_MIN_HEIGHT = 40
 MEDIUM_FORMULA_MAX_HEIGHT = 88
+COMPACT_FORMULA_MIN_HEIGHT = 34
+COMPACT_FORMULA_RECOMMENDED_FLOOR_RATIO = 0.50
 DISPLAY_FORMULA_MIN_HEIGHT = 44
+DISPLAY_FORMULA_RECOMMENDED_FLOOR_RATIO = 0.50
+
+# Keep these floor values in sync with the "Formula Size Quick Table" in
+# references/executor-base.md and the minimum readable size rule in
+# references/shared-standards.md. They are the enforcement source used by
+# svg_quality_checker.py through minimum_formula_display_floor().
 
 
 def formula_compact_length(latex: str) -> int:
@@ -143,11 +152,17 @@ def minimum_formula_display_floor(
 
     layout = str(recommended.get("layout") or "")
     if not display or layout == "inline-or-callout":
-        min_h = max(SHORT_FORMULA_MIN_HEIGHT, recommended_h)
+        min_h = SHORT_FORMULA_ERROR_MIN_HEIGHT
     elif layout == "formula-compact":
-        min_h = max(34, int(round(recommended_h * 0.85)))
+        min_h = max(
+            COMPACT_FORMULA_MIN_HEIGHT,
+            int(round(recommended_h * COMPACT_FORMULA_RECOMMENDED_FLOOR_RATIO)),
+        )
     else:
-        min_h = max(DISPLAY_FORMULA_MIN_HEIGHT, int(round(recommended_h * 0.65)))
+        min_h = max(
+            DISPLAY_FORMULA_MIN_HEIGHT,
+            int(round(recommended_h * DISPLAY_FORMULA_RECOMMENDED_FLOOR_RATIO)),
+        )
 
     min_w = max(1, int(round((width / height) * min_h)))
     return {

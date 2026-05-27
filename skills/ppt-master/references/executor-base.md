@@ -108,7 +108,16 @@ Before the first SVG page, output a confirmation listing: canvas dimensions, bod
   - **EXCEPTION ONLY: Tier A — baseline-shift** — permitted ONLY when ALL of: (a) single sub/super of 1–2 chars, (b) inline in prose where `<image>` breaks text flow, (c) max 1 Tier A per page. If in doubt, use Tier B.
   - **Inline super/sub stays one text frame** — for prose cases like `m^-3`, `cm^-3`, `H₂O`, `Tₑ`, Tier A means one `<text>` element / one PowerPoint text frame with inline `<tspan baseline-shift>`. Never place the base and exponent/subscript in separate adjacent `<text>` elements, and never "repair" QC output by nudging those separate boxes. This does **not** widen Tier A; if the case is not clearly eligible, use Tier B.
   - **Mandatory pre-scan**: before writing each SVG page, scan ALL planned text. Generate formula SVGs **before** writing the page. Raw patterns (`a_1`, `x^2`, `a/b`, `√x`) without `<image>` or `baseline-shift` are **blocking errors**.
-  - **Formula SVG size floor** — when placing a formula `<image>`, treat `notes/formula_asset_table.md` `Recommended display` as the minimum readable size. Do not shrink the formula below that floor just to save space; instead open more layout room, split the page, or make the formula the main object when needed.
+  - **Formula SVG size floor** — when placing a formula `<image>`, treat `notes/formula_asset_table.md` `Recommended display` as the target size. The blocking quality gate uses the floor below; if the formula still feels cramped at that floor, open more layout room, split the page, or make the formula the main object.
+
+  **Formula Size Quick Table**:
+
+  | `formula_asset_table.md` layout | Minimum on-slide height |
+  |---|---|
+  | `inline-or-callout` | `17px` |
+  | `formula-compact` | `max(34px, 50% of Recommended display height)` |
+  | display equation / other | `max(44px, 50% of Recommended display height)` |
+
   - Common formulas that MUST use Tier B (not Tier A): `H₂O` → `latex_to_svg.py "\mathrm{H_2O}"`; `10²` → `latex_to_svg.py "10^{2}"`; `Tₑ` → `latex_to_svg.py "T_e"`
   - **⛔ FORBIDDEN — formula avoidance by text substitution**: when the quality checker flags a formula, the ONLY fix is `latex_to_svg.py` → `<image>`. Replacing the formula with plain text (e.g. `φ_burst` → "破裂填充比", `P = C₁ε^C₂/(1+C₃ε^C₄)` → "四参数 S 型曲线", `x/y` → "x与y") is **strictly forbidden** — it destroys scientific meaning. Always generate the SVG and embed it.
   - **⛔ FORBIDDEN — formula removal by rewording**: deleting the mathematical symbol and rewording the sentence is equally forbidden. Examples of violations: `v_⊥²/(v²B) 较大` → "低速粒子", `v_∥ 足够大` → "平行速度分量足够大", `v_∥ 大于阈值` → "平行速度超过阈值". These hide scientific content behind vague natural-language descriptions. The ONLY correct response is: (1) run `latex_to_svg.py` to render the formula, (2) embed the SVG via `<image>`, (3) keep the original mathematical notation intact. If the formula cannot compile, fix the LaTeX source — never delete the formula.
@@ -160,8 +169,9 @@ Before drawing each page, look up its entry in `page_charts` to decide which cha
 - **Generation rhythm**: lock global design context first, then generate pages sequentially in one continuous context. No batched groups (e.g., 5 at a time).
 - **Phased batch generation** (recommended):
   1. **Visual Construction Phase**: generate all SVG pages sequentially for visual consistency. Use layout judgment for chart marks during the draft. **MUST embed plot-area markers** per §3.1 below on every chart page — coordinate calibration is a post-generation step (see [`workflows/verify-charts.md`](../workflows/verify-charts.md)) that depends on these markers.
-  2. **Quality Check Gate**: run `python3 scripts/svg_quality_checker.py <project_path>` on `svg_output/`. **Every `error` is a BLOCKING gate** — formula violations, fake sub/superscript text-box splits (`m` + `-3`, `H` + `2`, etc.), formula SVGs placed below their readable-size floor, `preserveAspectRatio="none"`, banned features, viewBox mismatch, spec_lock drift, non-PPT-safe font, etc. You MUST fix each error on the offending page and re-run the checker until 0 errors remain. Do NOT skip or defer errors and proceed to export — that defeats the quality gate. Address `warning`s when straightforward. Do NOT defer to after `finalize_svg.py` — finalize rewrites SVG and masks some violations.
-  3. **Logic Construction Phase**: after SVGs pass the quality check, batch-generate speaker notes for narrative continuity.
+  2. **Pre-QC Draft PPTX Export**: run `python3 scripts/svg_to_pptx.py <project_path> -o <project_path>/exports/pre_qc_draft.pptx --no-notes --no-open -a none` before the quality checker. This creates a no-notes PPTX snapshot from `svg_output/`. If export fails, fix the export-blocking SVG issue and retry before quality check.
+  3. **Quality Check Gate**: run `python3 scripts/svg_quality_checker.py <project_path>` on `svg_output/`. **Every `error` is a BLOCKING gate** — formula violations, fake sub/superscript text-box splits (`m` + `-3`, `H` + `2`, etc.), formula SVGs placed below their readable-size floor, `preserveAspectRatio="none"`, banned features, viewBox mismatch, spec_lock drift, non-PPT-safe font, etc. You MUST fix each error on the offending page and re-run the checker until 0 errors remain. Do NOT skip or defer errors and proceed to export — that defeats the quality gate. Address `warning`s when straightforward. Do NOT defer to after `finalize_svg.py` — finalize rewrites SVG and masks some violations.
+  4. **Logic Construction Phase**: after SVGs pass the quality check, batch-generate speaker notes for narrative continuity.
 
 ### 3.1 Chart Plot-Area Marker (MANDATORY on every chart page)
 

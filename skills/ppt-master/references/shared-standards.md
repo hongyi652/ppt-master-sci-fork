@@ -240,14 +240,22 @@ FOR each text string planned for this page:
        d. Embed the generated SVG as <image>
     3. NEVER fall back to plain text or Tier A without meeting ALL exception criteria.
        If latex_to_svg.py fails, surface the error and stop.
-
-  **Minimum readable size rule**:
-
-  - Formula SVGs in PPT must not be placed below their readable-size floor.
-  - Use `notes/formula_asset_table.md` `Recommended display` as the minimum on-slide size, not as an optional suggestion.
-  - Short / inline formulas may stay near text scale, but "near text scale" does **not** mean tiny. Placements like `134 x 18` for a roughly 10-character formula are too small and are forbidden.
-  - `svg_quality_checker.py` treats undersized formula `<image>` placements as blocking errors.
 ```
+
+**Minimum readable size rule**:
+
+- Formula SVGs in PPT must not be placed below their readable-size floor.
+- Use `notes/formula_asset_table.md` `Recommended display` as the preferred on-slide size. The blocking quality gate enforces the minimum floor below.
+- Apply the same floor used by `scripts/formula_display_policy.py`:
+
+  | `formula_asset_table.md` layout | Minimum on-slide height |
+  |---|---|
+  | `inline-or-callout` | `17px` |
+  | `formula-compact` | `max(34px, 50% of Recommended display height)` |
+  | display equation / other | `max(44px, 50% of Recommended display height)` |
+
+- Short / inline formulas may stay near text scale, but "near text scale" does **not** mean tiny. Placements like `134 x 18` for a roughly 10-character formula are too small and are forbidden.
+- `svg_quality_checker.py` treats undersized formula `<image>` placements as blocking errors.
 
 #### Tier A — Native Sub/Superscript via `baseline-shift` (EXCEPTION ONLY)
 

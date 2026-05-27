@@ -11,6 +11,7 @@ Usage:
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -263,10 +264,13 @@ class ProjectManager:
         return destination
 
     def _run_tool(self, args: list[str]) -> None:
+        env = os.environ.copy()
+        env.setdefault("PYTHONIOENCODING", "utf-8")
         try:
             result = subprocess.run(
                 args,
                 cwd=REPO_ROOT,
+                env=env,
                 check=True,
                 capture_output=True,
                 text=True,

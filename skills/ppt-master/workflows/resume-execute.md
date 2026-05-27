@@ -57,6 +57,8 @@ The fresh session pays the cost of re-reading references (~14K tokens) but earns
 
 **Source materials**: Phase B is a fresh session; `<project_path>/sources/<file>.md` is NOT in context. The Executor SHOULD read the relevant `sources/` files when crafting per-page content — they hold the concrete facts, quotes, names, and details that turn skeleton outlines into substantive slides. `design_spec.md §IX` only carries the per-page intent; the source materials carry the texture. The Phase A → Phase B split is designed to free context budget precisely for this kind of high-quality enrichment.
 
+**Mandatory disk reload**: Phase B MUST read the on-disk `design_spec.md`, `spec_lock.md`, relevant `sources/*.md`, and `notes/formula_asset_table.md` when present. Do not rely on Phase A conversation memory for content facts, palette, formula sizing, image references, or page rhythm.
+
 > Note: this workflow does NOT duplicate Step 6 / Step 7 content. SKILL.md is the authoritative procedure; resume-execute only adds the resumption entry (When to Run + Step 1 sanity check above) and the source-materials guidance above.
 
 ---

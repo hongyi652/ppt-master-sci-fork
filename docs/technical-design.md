@@ -25,12 +25,13 @@ User Input (PDF/DOCX/XLSX/URL/Markdown)
     User names a template: copy template files into the project
     Need a new global template: use /create-template workflow separately
     ↓
-[Strategist] - Eight Confirmations & Design Specifications → design_spec.md + spec_lock.md
+[Strategist] - Design Specifications; Eight Confirmations block only in step-by-step mode → design_spec.md + spec_lock.md
     ↓
 [Image Acquisition] (when any row in the resource list needs AI generation or web search)
     ↓
 [Executor]
     ├── Visual construction: generate all SVG pages → svg_output/
+    ├── Pre-QC draft export → exports/pre_qc_draft.pptx
     ├── [Quality Check] svg_quality_checker.py (mandatory — must pass with 0 errors)
     └── Notes generation: complete speaker notes → notes/total.md
     ↓
@@ -42,6 +43,7 @@ User Input (PDF/DOCX/XLSX/URL/Markdown)
     ↓
 Output:
     exports/
+    ├── pre_qc_draft.pptx                      ← Early no-notes PPTX snapshot before quality check
     ├── presentation_<timestamp>.pptx          ← Native shapes (DrawingML) — canonical output, edit & deliver from here
     └── presentation_<timestamp>_svg.pptx      ← SVG snapshot pptx — pixel-perfect visual reference (opt-in via --svg-snapshot)
 
@@ -142,7 +144,7 @@ PPT Master uses **role switching within one main agent** rather than parallel su
 
 **Why role-specialized references, not one mega prompt.** Strategist runs in "negotiate with user" mode (open-ended, conversational, willing to back up); Executor runs in "produce strict XML" mode (no improvisation, no missing attributes). Mixing both into one prompt forces the model to hold incompatible discipline in the same turn — every prompt-engineering pathology of mode-mixing shows up. Splitting into per-role files lets each role load only what it needs and discard the rest.
 
-**Eight Confirmations as the only blocking gate.** Strategist ends with eight bundled user confirmations (canvas / page count / audience / style / color / icon / typography / image) presented as one blocking decision point. After confirmation, the pipeline runs to completion without further interrupts. The reason it's bundled and singular: design choices are correlated (color affects icon library affects typography), so resolving them together produces coherent decisions, while spreading confirmations across phases would invite contradictory user inputs and force backtracking.
+**Mode-aware confirmation gate.** Step-by-step mode keeps the eight bundled user confirmations (canvas / page count / audience / style / color / icon / typography / image) as one blocking decision point, with deck-copy language asked first. One-click mode skips both prompts: Strategist auto-locks the recommended language and eight decisions, writes them to `design_spec.md` / `spec_lock.md`, and the pipeline runs to completion without further interrupts. The reason the decisions stay bundled is correlation: color affects icon library and typography, so resolving them together produces coherent decisions, while spreading confirmations across phases would invite contradictory user inputs and force backtracking.
 
 **User-provided image analysis goes through metadata, not pixels.** When the user supplies images, Strategist runs an extractor that summarizes dimensions, EXIF orientation, dominant color, and subject — and reasons over that text. Opening image bytes directly is forbidden because the LLM doesn't need pixels to make layout decisions; it needs facts that fit on a page (aspect ratio for placement, color tone for palette compatibility, subject for slide assignment). Pixel reading would burn context for no decision-quality gain.
 

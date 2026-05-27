@@ -1209,7 +1209,7 @@ class SVGQualityChecker:
     _FORMULA_PATTERNS: List[Tuple[re.Pattern, str]] = [
         # Subscript notation:  a_1  T_e  ρ_L  x_{n+1}  H_2O
         (re.compile(r'[A-Za-z\u0370-\u03FF\u0400-\u04FF]_[\{\[A-Za-z0-9⊥∥]'),
-         "subscript notation (e.g. T_e, H_2O, x_{n+1})"),
+         "scientific subscript notation (e.g. T_e, H_2O, x_{n+1})"),
         # Superscript notation:  a^2  x^n  e^{-x}  cm^{-3}
         (re.compile(r'[A-Za-z0-9\u0370-\u03FF\)]\^[\{\[A-Za-z0-9\-+]'),
          "superscript notation (e.g. x^2, e^{-x}, cm^{-3})"),
@@ -1256,6 +1256,13 @@ class SVGQualityChecker:
         'C/m', 'g/L', 'g/l', 'mg/L', 'rad/s', 'eV/K',
         'K/min', 'J/mol', 'g/mol', 'L/min', 'mL/min',
     })
+    _SAFE_UNIT_TOKEN_RE: re.Pattern = re.compile(
+        r'^(?:'
+        r'(?:[pnumcdkMGT]?(?:m|g|s|A|K|mol|cd|Hz|N|Pa|J|W|C|V|F|S|'
+        r'Wb|T|H|lm|lx|B|L|l|eV|rad|sr|min|h|sec))'
+        r'(?:[-+]?\d{1,2})?'
+        r')$'
+    )
 
     def _check_plain_text_formulas(self, content: str, result: Dict):
         """Detect mathematical notation written as <text>/<tspan> content.
@@ -1326,25 +1333,48 @@ class SVGQualityChecker:
                 # patterns (fractions, equations).
                 if self._is_formula_false_positive(match, description):
                     continue
-                snippet = fragment[:80] + ('…' if len(fragment) > 80 else '')
+                snippet = fragment[:80] + ('...' if len(fragment) > 80 else '')
+                fix_hint = self._formula_fix_hint(description)
                 violations.append(
                     f"Plain-text formula detected ({description}): "
-                    f"\"{snippet}\" — use baseline-shift (Tier A) or "
-                    f"latex_to_svg.py (Tier B) per Iron Rule §4.1"
+                    f"\"{snippet}\" - {fix_hint}"
                 )
                 break  # one violation per fragment is enough
+
+    @staticmethod
+    def _formula_fix_hint(description: str) -> str:
+        """Return a targeted fix hint for the detected formula pattern."""
+        if 'subscript' in description:
+            return (
+                "scientific subscripts such as E_k/H_2O must be rendered with "
+                "latex_to_svg.py (Tier B), or as one Tier A baseline-shift text "
+                "frame only when the narrow inline exception applies"
+            )
+        if 'fraction' in description:
+            return (
+                "render variable fractions with latex_to_svg.py (Tier B); "
+                "plain unit rates such as m2/s are allow-listed only when "
+                "unambiguous"
+            )
+        return (
+            "use baseline-shift (Tier A) only for the narrow inline exception, "
+            "otherwise render with latex_to_svg.py (Tier B) per Iron Rule 4.1"
+        )
 
     def _is_formula_false_positive(self, match: re.Match, description: str) -> bool:
         """Return True if the regex match is a known false positive.
 
         Suppresses common non-formula patterns that the broad regexes
-        accidentally catch:  abbreviation slashes (HS/VSS, E/B),
-        unit rates (m/s, steps/sec), and long-name definitions.
+        accidentally catch: abbreviation slashes (HS/VSS, E/B), unit rates
+        (m/s, m2/s, cm2/s, kg/m3, steps/sec), and long-name definitions.
         """
         matched = match.group()
         if 'fraction' in description:
             # Known safe unit fractions
             if matched in self._SAFE_UNIT_FRACTIONS:
+                return True
+            parts = matched.split('/', 1)
+            if len(parts) == 2 and all(self._SAFE_UNIT_TOKEN_RE.match(part) for part in parts):
                 return True
             # Structural safe-slash patterns (abbreviations, English words)
             if self._SAFE_SLASH_RE.match(matched):

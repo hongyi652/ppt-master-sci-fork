@@ -38,8 +38,8 @@ ${PYTHON} ${SKILL_DIR}/scripts/preflight_check.py <project_path>
 > **This workflow is a strict serial pipeline. The following rules have the highest priority — violating any one of them constitutes execution failure:**
 >
 > 1. **SERIAL EXECUTION** — Steps MUST be executed in order; the output of each step is the input for the next. Non-BLOCKING adjacent steps may proceed continuously once prerequisites are met, without waiting for the user to say "continue"
-> 2. **BLOCKING = HARD STOP** — Steps marked ⛔ BLOCKING require a full stop. Exception: the timeout-enabled decision gates defined in Step 0 and Step 4 may wait up to 120 seconds, then auto-apply the currently recommended option(s) if the user stays silent. Outside those gates, the AI MUST wait for an explicit user response before proceeding and MUST NOT make any decisions on behalf of the user
-> 3. **NO CROSS-PHASE BUNDLING** — Cross-phase bundling is FORBIDDEN. (Note: the Eight Confirmations in Step 4 are ⛔ BLOCKING — the AI MUST present recommendations and wait for explicit user confirmation, or for the 120-second timeout fallback to accept the recommended bundle, before proceeding. Once the bundle is confirmed or the timeout fallback is applied, all subsequent non-BLOCKING steps — design spec output, SVG generation, speaker notes, and post-processing — may proceed automatically without further user confirmation)
+> 2. **BLOCKING = HARD STOP** — Steps marked ⛔ BLOCKING require a full stop. Exception: the timeout-enabled decision gates defined in Step 0 and Step 4 may wait up to 120 seconds, then auto-apply the currently recommended option(s) if the user stays silent. If the user chooses **One-click** in Step 0, Step 4's language gate and Eight Confirmations gate are skipped and auto-locked from the Strategist's recommended defaults. Outside those gates, the AI MUST wait for an explicit user response before proceeding and MUST NOT make any decisions on behalf of the user
+> 3. **NO CROSS-PHASE BUNDLING** — Cross-phase bundling is FORBIDDEN. (Note: in Step-by-step mode, the Eight Confirmations in Step 4 are ⛔ BLOCKING — the AI MUST present recommendations and wait for explicit user confirmation, or for the 120-second timeout fallback to accept the recommended bundle, before proceeding. In One-click mode, Step 4 recommendations are auto-locked without asking. Once the bundle is confirmed, auto-accepted, or auto-locked, all subsequent non-BLOCKING steps — design spec output, SVG generation, speaker notes, and post-processing — may proceed automatically without further user confirmation)
 > 4. **GATE BEFORE ENTRY** — Each Step has prerequisites (🚧 GATE) listed at the top; these MUST be verified before starting that Step
 > 5. **NO SPECULATIVE EXECUTION** — "Pre-preparing" content for subsequent Steps is FORBIDDEN (e.g., writing SVG code during the Strategist phase)
 > 6. **NO SUB-AGENT SVG GENERATION** — Executor Step 6 SVG generation is context-dependent and MUST be completed by the current main agent end-to-end. Delegating page SVG generation to sub-agents is FORBIDDEN
@@ -72,9 +72,9 @@ ${PYTHON} ${SKILL_DIR}/scripts/preflight_check.py <project_path>
 >
 > - **Response language**: match the user's input and source materials. Explicit user override (e.g., "请用英文回答") takes precedence.
 > - **Template format**: `design_spec.md` MUST follow its original English template structure (section headings, field names) regardless of conversation language. Content values may be in the user's language.
-> - **Deck text language is explicit — ASK FIRST**: Strategist MUST proactively ask the user which language the PPT copy should use **before** presenting the Eight Confirmations bundle (e.g. Chinese / English / bilingual). This is the very first question in the pipeline. Do not infer from chat language alone; do not skip it.
+> - **Deck text language is explicit — ASK FIRST in Step-by-step mode**: Strategist MUST proactively ask the user which language the PPT copy should use **before** presenting the Eight Confirmations bundle (e.g. Chinese / English / bilingual). This is the very first question in the Step-by-step pipeline. If Step 0 locked One-click mode, do not ask; auto-lock the recommended language (`zh-CN` unless the user/source clearly requires another language).
 > - **Default deck language**: when the user has not specified a deck-copy language, Strategist MUST recommend `zh-CN` as the default option. Switch to another language only on explicit user choice or when the source task clearly requires it.
-> - **Timed fallback for the language gate**: the language question is timeout-enabled. After presenting the options and the recommendation, wait up to 120 seconds. If the user does not answer, lock the recommended language (`zh-CN` unless another recommendation is explicitly justified by the source task) and continue. When continuing, explicitly state that the timeout fallback was applied.
+> - **Timed fallback for the language gate**: in Step-by-step mode, the language question is timeout-enabled. After presenting the options and the recommendation, wait up to 120 seconds. If the user does not answer, lock the recommended language (`zh-CN` unless another recommendation is explicitly justified by the source task) and continue. When continuing, explicitly state that the timeout fallback was applied. In One-click mode, skip this question and auto-lock the recommended language immediately.
 > - **Light background by default**: unless the user **explicitly** requests a dark background (e.g. "用深色背景" / "dark background" / "dark tech style with dark bg"), every deck MUST use a light (white or near-white) page background. Merely choosing a "dark tech" visual style does NOT automatically trigger a dark background — the background stays light unless the user says otherwise. Record this in `design_spec.md §II` and `spec_lock.md`.
 
 > [!IMPORTANT]
@@ -137,7 +137,7 @@ For complete tool documentation, see `${SKILL_DIR}/scripts/README.md`.
 Before starting the pipeline, ask the user:
 
 > **执行模式选择 / Execution Mode**:
-> 1. **一键执行模式 (One-click)** — 全流程自动执行，中间只在八次确认（Step 4）暂停等待用户确认，其余步骤（文件读写、脚本运行、SVG 生成、后处理、导出）全部自动完成，不再逐一请求权限。
+> 1. **一键执行模式 (One-click)** — 全流程自动执行，不在语言选择或八次确认（Step 4）暂停；Strategist 自动锁定推荐语言和八项方案，其余步骤（文件读写、脚本运行、SVG 生成、质量检查、后处理、导出）全部自动完成，不再逐一请求权限。
 > 2. **逐步确认模式 (Step-by-step)** — 每个文件操作和命令执行都向用户请求权限后再执行（默认行为）。
 
 **Recommendation**: explicitly recommend one mode before waiting.
@@ -150,6 +150,8 @@ Before starting the pipeline, ask the user:
 **Timeout policy**: this question is timeout-enabled. After presenting both options and the recommendation, wait up to 120 seconds. If the user does not choose, continue with the recommended mode and explicitly state that the timeout fallback was applied.
 
 **If the user chooses one-click mode**:
+
+Record `execution_mode: one-click` for the rest of this run. Step 4 MUST NOT ask the deck-copy language question and MUST NOT wait for Eight Confirmations. Strategist still reads the required templates/references, computes the recommendations, writes the language and eight decisions into `design_spec.md` / `spec_lock.md`, and states that the one-click defaults were auto-locked.
 
 For **Claude Code** (VS Code extension): ensure the project has `.claude/settings.json` with tool permissions pre-configured (see repo root for the shipped file). If the file is missing, create it from the template. This file allows Claude Code to execute bash commands, read/write/edit project files without per-action approval.
 
@@ -356,9 +358,13 @@ Read references/strategist.md
 
 **Eight Confirmations** (full template: `templates/design_spec_reference.md`):
 
-**Language timeout policy**: before presenting the bundled eight items, ask the deck-copy language first, recommend a concrete default (`zh-CN` unless the source clearly justifies another language), and wait up to 120 seconds. If the user does not answer, lock the recommended language and continue to the bundle. Explicitly state when this timeout fallback is applied.
+**Language policy**:
+- **One-click mode**: do NOT ask. Auto-lock the recommended deck-copy language (`zh-CN` unless the user/source clearly requires another language), then write it into `design_spec.md` and `spec_lock.md`.
+- **Step-by-step mode**: before presenting the bundled eight items, ask the deck-copy language first, recommend a concrete default (`zh-CN` unless the source clearly justifies another language), and wait up to 120 seconds. If the user does not answer, lock the recommended language and continue to the bundle. Explicitly state when this timeout fallback is applied.
 
-⛔ **BLOCKING (120-second fallback enabled)**: present the Eight Confirmations as a single bundled recommendation set and wait for explicit user confirmation or modification before outputting Design Specification & Content Outline. If the user does not respond within 120 seconds, treat the full recommended set as accepted, explicitly say that the timeout fallback was applied, and proceed. This is the single core confirmation point — once confirmed or auto-accepted by timeout, all subsequent steps proceed automatically.
+**Eight Confirmations gate**:
+- **One-click mode**: do NOT ask and do NOT wait. Generate the eight recommended decisions, state that they were auto-locked by one-click mode, then immediately write the Design Specification & Content Outline.
+- **Step-by-step mode**: ⛔ **BLOCKING (120-second fallback enabled)** — present the Eight Confirmations as a single bundled recommendation set and wait for explicit user confirmation or modification before outputting Design Specification & Content Outline. If the user does not respond within 120 seconds, treat the full recommended set as accepted, explicitly say that the timeout fallback was applied, and proceed. This is the single core confirmation point — once confirmed or auto-accepted by timeout, all subsequent steps proceed automatically.
 
 1. Canvas format
 2. Page count range
@@ -369,11 +375,11 @@ Read references/strategist.md
 7. Typography plan
 8. Image usage approach
 
-**Mandatory — split-mode note** (not a ninth confirmation): after listing the eight confirmation details, you MUST append exactly one short line (rendered in the user's language, prefixed with 💡) about generation mode. Pick the variant by qualitative read of Phase A signals — recommended page count, source-material bulk, whether `topic-research` ran with substantial web-fetch accumulation:
+**Mandatory — split-mode note** (not a ninth confirmation): after listing the eight confirmation details, you MUST append exactly one short line (rendered in the user's language, prefixed with 💡) about generation mode. Pick the variant by qualitative read of Phase A signals — recommended page count, source-material bulk, formula manifest length, source image count, converted Markdown length, whether `topic-research` ran with substantial web-fetch accumulation:
 
 | Signal read | Line content |
 |---|---|
-| Heavy (long page count / bulky sources / heavy web-fetch accumulation) | State estimated page count and large source size; recommend switching to [split mode](workflows/resume-execute.md) after Step 5 — stop this chat, open a fresh window and input `继续生成 projects/<project_name>` to enter Phase B (SVG generation + export); no response or "continue" = default continuous mode. |
+| Heavy (long page count / bulky sources / long formula list / many source images / long converted Markdown / heavy web-fetch accumulation) | State the heavy signal(s); recommend switching to [split mode](workflows/resume-execute.md) after Step 5 because Phase B drops Strategist references, eight-confirmation dialogue, and source-conversion chatter from context. Tell the user to stop this chat, open a fresh window, and input `继续生成 projects/<project_name>` to enter Phase B (SVG generation + export); no response or "continue" = default continuous mode. |
 | Normal (default) | State scale is moderate, default continuous mode generates in one go; if mid-way window switch is desired, input `继续生成 projects/<project_name>` after Step 5 to switch to [split mode](workflows/resume-execute.md). |
 
 This line is required output every run — the user must always see the mode choice exists. Whether to act on it is the user's call.
@@ -394,7 +400,7 @@ ${PYTHON} ${SKILL_DIR}/scripts/analyze_images.py <project_path>/images
 **✅ Checkpoint — Phase deliverables complete, auto-proceed to next step**:
 ```markdown
 ## ✅ Strategist Phase Complete
-- [x] Eight Confirmations completed (user confirmed or 120-second timeout fallback applied)
+- [x] Eight Confirmations completed (one-click auto-locked, user confirmed, or 120-second timeout fallback applied)
 - [x] Split-mode note appended below the eight items (heavy or normal variant)
 - [x] Design Specification & Content Outline generated
 - [x] Execution lock (spec_lock.md) generated
@@ -405,7 +411,7 @@ ${PYTHON} ${SKILL_DIR}/scripts/analyze_images.py <project_path>/images
 
 ### Step 5: Image Acquisition Phase (Conditional)
 
-🚧 **GATE**: Step 4 complete; Design Specification & Content Outline generated and user confirmed.
+🚧 **GATE**: Step 4 complete; Design Specification & Content Outline generated and one-click auto-locked, user confirmed, or timeout-accepted.
 
 > **Trigger**: At least one row in the resource list has `Acquire Via: ai` and/or `Acquire Via: web`. If every row is `user` or `placeholder`, skip to Step 6.
 
@@ -495,6 +501,14 @@ ${PYTHON} ${SKILL_DIR}/scripts/start_live_preview.py <project_path>
 
 **Visual Construction Phase**: generate SVG pages sequentially, one at a time, in one continuous pass → `<project_path>/svg_output/`
 
+**Pre-QC Draft PPTX Export (Mandatory)** — after all SVGs are written, BEFORE `svg_quality_checker.py`:
+```bash
+${PYTHON} ${SKILL_DIR}/scripts/svg_to_pptx.py <project_path> -o <project_path>/exports/pre_qc_draft.pptx --no-notes --no-open -a none
+```
+- This draft consumes `svg_output/` directly and has no speaker notes; it is an early PPTX snapshot for inspection before the quality gate rewrites any pages.
+- If the command fails, fix the export-blocking SVG issue and retry the draft export before running the quality checker.
+- The final canonical PPTX is still produced in Step 7 after quality check, notes, and post-processing.
+
 **Quality Check Gate (Mandatory)** — after all SVGs, BEFORE annotation handling and speaker notes:
 ```bash
 ${PYTHON} ${SKILL_DIR}/scripts/svg_quality_checker.py <project_path>
@@ -510,6 +524,7 @@ ${PYTHON} ${SKILL_DIR}/scripts/svg_quality_checker.py <project_path>
 ## ✅ Executor Phase Complete
 - [x] Live preview started and kept available at the reported URL
 - [x] All SVGs generated to svg_output/
+- [x] Pre-QC draft PPTX exported to exports/pre_qc_draft.pptx
 - [x] svg_quality_checker.py passed (0 errors)
 - [x] Speaker notes generated at notes/total.md
 ```

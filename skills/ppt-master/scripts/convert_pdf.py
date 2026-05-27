@@ -40,12 +40,15 @@ _SOURCE_TO_MD_DIR = _SCRIPTS_DIR / "source_to_md"
 if str(_SOURCE_TO_MD_DIR) not in sys.path:
     sys.path.insert(0, str(_SOURCE_TO_MD_DIR))
 
+from console_encoding import configure_utf8_stdio  # noqa: E402
 from mineru_to_md import (  # noqa: E402
     MinerUNormalizeResult,
     convert_with_mineru,
     normalize_mineru_zip,
 )
 from output_guard import resolve_project_bound_markdown_output  # noqa: E402
+
+configure_utf8_stdio()
 
 DEFAULT_RETRIES = 2
 DEFAULT_RETRY_DELAY_SECONDS = 5.0
