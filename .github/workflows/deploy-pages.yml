@@ -39,11 +39,18 @@ jobs:
         with:
           enablement: true
 
+      - name: Prepare site artifact
+        run: |
+          mkdir -p site/examples site/docs/assets/screenshots
+          cp index.html viewer.html site/
+          cp -R examples/. site/examples/
+          cp docs/assets/screenshots/preview_pritzker_2026.png site/docs/assets/screenshots/
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # 上传整个仓库（包含 examples、templates 等）
-          path: '.'
+          # 仅上传 GitHub Pages 实际需要的静态站点文件
+          path: 'site'
 
   # 部署任务
   deploy:
