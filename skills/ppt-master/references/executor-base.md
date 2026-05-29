@@ -99,24 +99,9 @@ Before the first SVG page, output a confirmation listing: canvas dimensions, bod
 - Font family from `typography`: use role override (`title_family` / `body_family` / `emphasis_family` / `code_family`) if declared, else fall back to `font_family`
 - Font sizes follow a **ramp anchored on `typography.body`**, not a closed menu. Use the declared slots when they fit. Intermediate sizes (e.g., 40px hero number, 13px annotation) are allowed if the ratio to `body` falls within the role's band (see `design_spec.md §IV ramp table`). Sizes outside every band require extending the lock first.
 - Images MUST reference files listed under `images`; no invented filenames
-- **⛔ IRON RULE — No plain-text formulas / SVG-FIRST** — see [`shared-standards.md §4.1`](shared-standards.md) for the full rules. This is a **blocking error** — the page MUST NOT be saved with raw formula text. **NEVER split a formula across multiple `<text>` elements.** SVG-first policy:
-  - **DEFAULT: Tier B — SVG image for ALL formulas** — including simple sub/superscripts (10², H₂O, Tₑ, m²). Before writing each page, call `latex_to_svg.py` for every formula-like expression:
-    ```
-    python3 ${SKILL_DIR}/scripts/latex_to_svg.py "<latex_expression>" -o <project_path>/images/formula_inline_<NNN>.svg
-    ```
-    Then embed as `<image href="../images/formula_inline_<NNN>.svg" .../>`. Counter `<NNN>` from 901.
-  - **EXCEPTION ONLY: Tier A — baseline-shift** — permitted ONLY when ALL of: (a) single sub/super of 1–2 chars, (b) inline in prose where `<image>` breaks text flow, (c) max 1 Tier A per page. If in doubt, use Tier B.
-  - **Inline super/sub stays one text frame** — for prose cases like `m^-3`, `cm^-3`, `H₂O`, `Tₑ`, Tier A means one `<text>` element / one PowerPoint text frame with inline `<tspan baseline-shift>`. Never place the base and exponent/subscript in separate adjacent `<text>` elements, and never "repair" QC output by nudging those separate boxes. This does **not** widen Tier A; if the case is not clearly eligible, use Tier B.
-  - **Mandatory pre-scan**: before writing each SVG page, scan ALL planned text. Generate formula SVGs **before** writing the page. Raw patterns (`a_1`, `x^2`, `a/b`, `√x`) without `<image>` or `baseline-shift` are **blocking errors**.
-  - **Formula SVG size floor** — when placing a formula `<image>`, treat `notes/formula_asset_table.md` `Recommended display` as the target size. The blocking quality gate uses the floor below; if the formula still feels cramped at that floor, open more layout room, split the page, or make the formula the main object.
-
-  **Formula Size Quick Table**:
-
-  | `formula_asset_table.md` layout | Minimum on-slide height |
-  |---|---|
-  | `inline-or-callout` | `17px` |
-  | `formula-compact` | `max(34px, 50% of Recommended display height)` |
-  | display equation / other | `max(44px, 50% of Recommended display height)` |
+- **⛔ IRON RULE — No plain-text formulas / SVG-FIRST** — see [`shared-standards.md §4.1`](shared-standards.md) for full tier definitions, conditions, and the formula size quick table. This is a **blocking error** — the page MUST NOT be saved with raw formula text. **NEVER split a formula across multiple `<text>` elements.**
+  - **Workflow**: before writing each SVG page, scan ALL planned text. Call `latex_to_svg.py` for every formula-like expression, embed as `<image href="../images/formula_inline_<NNN>.svg" .../>` (counter from 901). Raw patterns without `<image>` or `baseline-shift` → blocking error.
+  - **Formula SVG size floor** — treat `notes/formula_asset_table.md` `Recommended display` as the target size. Minimum heights: `inline-or-callout` 17px, `formula-compact` max(34px, 50% recommended), display equation max(44px, 50% recommended).
 
   - Common formulas that MUST use Tier B (not Tier A): `H₂O` → `latex_to_svg.py "\mathrm{H_2O}"`; `10²` → `latex_to_svg.py "10^{2}"`; `Tₑ` → `latex_to_svg.py "T_e"`
   - **⛔ FORBIDDEN — formula avoidance by text substitution**: when the quality checker flags a formula, the ONLY fix is `latex_to_svg.py` → `<image>`. Replacing the formula with plain text (e.g. `φ_burst` → "破裂填充比", `P = C₁ε^C₂/(1+C₃ε^C₄)` → "四参数 S 型曲线", `x/y` → "x与y") is **strictly forbidden** — it destroys scientific meaning. Always generate the SVG and embed it.
@@ -328,7 +313,7 @@ Handle images by their status in the Design Spec's Image Resource List. Status e
 | Status | Source | Handling |
 |--------|--------|----------|
 | **Existing** | User-provided | Reference images directly from `../images/` directory |
-| **Formula SVG** | LaTeX-rendered (`formula_*.svg`) | ⛔ IRON RULE — ALL formulas (including simple sub/super like 10², H₂O) MUST be embedded via `<image href="../images/formula_XXX.svg" .../>` by default. Generate with `latex_to_svg.py "<expr>" -o <project>/images/formula_inline_<NNN>.svg` (counter from 901). Tier A (`baseline-shift`) is a narrow exception — see [`shared-standards.md §4.1`](shared-standards.md). Use `short_alias` from `image_asset_table.md` for lookup |
+| **Formula SVG** | LaTeX-rendered (`formula_*.svg`) | ⛔ IRON RULE — embed via `<image href="../images/formula_XXX.svg" .../>` (Tier B default). Tier A (`baseline-shift`) is a narrow exception — see [`shared-standards.md §4.1`](shared-standards.md). Use `short_alias` from `image_asset_table.md` for lookup |
 | **Generated** | Generated by Image_Generator | Reference images directly from `../images/` directory |
 | **Sourced** | Web-acquired by Image_Searcher | Reference from `../images/`. **Read [`image_sources.json`](image-searcher.md) to decide attribution** — see §6.1 below. |
 | **Needs-Manual** | Acquisition failed and file is absent | Use dashed border placeholder unless the expected file exists |

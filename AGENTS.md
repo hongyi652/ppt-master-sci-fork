@@ -48,16 +48,16 @@ PPT Master is an AI-driven presentation generation system. Multi-role collaborat
 
 Convenience summary only — full workflow in [`skills/ppt-master/SKILL.md`](skills/ppt-master/SKILL.md).
 
-> **Python command**: All examples below use `python3` as a placeholder. On Windows, `python3` may point to a Microsoft Store stub (exit code 49). **Detect the working command first** by trying `python3 --version`, `python --version`, `py -3 --version` in order — use whichever succeeds. `preflight_check.py` auto-detects and prints `PYTHON_CMD=<cmd>`. Use that value for the entire session.
+> **Python command**: All examples below use `python3` as a placeholder. On Windows, `python3` / `python` may print a version but fail to execute scripts. **Detect the working command first** by trying `python3 -c "print('OK')"`, `python -c "print('OK')"`, `py -3 -c "print('OK')"` in order — use whichever succeeds. `preflight_check.py` auto-detects and prints `PYTHON_CMD=<cmd>`. Use that value for the entire session.
 
 ```bash
 # Python detection (run FIRST in every session)
-# Try: python3 --version / python --version / py -3 --version
+# Try: python3 -c "print('OK')" / python -c "print('OK')" / py -3 -c "print('OK')"
 # Use the first one that works as ${PYTHON} below.
 # preflight_check.py also prints PYTHON_CMD=<cmd> for you.
 
 # Source content conversion
-${PYTHON} skills/ppt-master/scripts/convert_pdf.py <PDF_file>                          # stable wrapper: proxy/SSL, retry, zip, report
+${PYTHON} skills/ppt-master/scripts/convert_pdf.py <file>                              # MinerU wrapper: PDF/DOCX/PPTX/XLSX, proxy/SSL, retry, report
 ${PYTHON} skills/ppt-master/scripts/source_to_md/mineru_to_md.py <PDF_file>            # direct MinerU call
 ${PYTHON} skills/ppt-master/scripts/source_to_md/doc_to_md.py <DOCX_or_other_file>
 ${PYTHON} skills/ppt-master/scripts/source_to_md/excel_to_md.py <XLSX_or_XLSM_file>
@@ -92,11 +92,14 @@ ${PYTHON} skills/ppt-master/scripts/svg_quality_checker.py <project_path>
 ${PYTHON} skills/ppt-master/scripts/animation_config.py scaffold <project_path>  # optional, only for custom object-level animation
 ${PYTHON} skills/ppt-master/scripts/animation_config.py validate <project_path>  # optional, before re-export
 
-# Post-processing pipeline: run sequentially, one command at a time
+# Post-processing pipeline — one-command wrapper (recommended)
+${PYTHON} skills/ppt-master/scripts/postprocess.py <project_path>
+# Add --merge-paragraphs when the user wants paragraph-level editable text frames instead of one-per-line (default off, see SKILL.md Step 7.3).
+
+# Post-processing pipeline — manual three-step alternative
 ${PYTHON} skills/ppt-master/scripts/total_md_split.py <project_path>
 ${PYTHON} skills/ppt-master/scripts/finalize_svg.py <project_path>
 ${PYTHON} skills/ppt-master/scripts/svg_to_pptx.py <project_path>
-# Add --merge-paragraphs when the user wants paragraph-level editable text frames instead of one-per-line (default off, see SKILL.md Step 7.3).
 ```
 
 ## Core Directories

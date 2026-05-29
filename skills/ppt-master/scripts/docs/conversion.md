@@ -1,21 +1,22 @@
 # Conversion Tools
 
-> Architecture rationale (why MinerU is the only PDF path, why pandoc remains a fallback for some document formats, and why curl_cffi is used for TLS impersonation): see [docs/technical-design.md "Source Content Conversion"](../../../../docs/technical-design.md#source-content-conversion).
+> Architecture rationale (why MinerU is the preferred parser, why pandoc remains a fallback for some document formats, and why curl_cffi is used for TLS impersonation): see [docs/technical-design.md "Source Content Conversion"](../../../../docs/technical-design.md#source-content-conversion).
 
 Source conversion tools are low-level building blocks behind `project_manager.py import-sources`. In the normal PPT workflow, create the project first and import sources so every derived Markdown file, `_files/` directory, zip, and report stays inside the project tree instead of beside the original source document.
 
-## PDF parsing via `source_to_md/mineru_to_md.py`
+## MinerU parsing via `source_to_md/mineru_to_md.py`
 
-PPT Master now uses MinerU as the only supported PDF parser. The older `source_to_md/pdf_to_md.py` command remains only as a compatibility shim and exits with an error telling you to use MinerU.
+PPT Master uses MinerU as the preferred parser for **PDF, DOCX, PPTX, XLSX, and images** (MinerU v3.1+). For PDF, MinerU is the only supported path. For DOCX/PPTX/XLSX, MinerU is tried first when a token is configured; on failure, the local fallback converter is used automatically.
 
 MinerU normalizes its result zip into the project convention used throughout the repo: `<output>.md` plus a sibling `<output>_files/` directory. Extracted images are referenced from Markdown and `image_manifest.json` is written for project import.
 
 Preferred workflow:
-- `python3 scripts/project_manager.py import-sources <project_path> <file.pdf>`
+- `python3 scripts/project_manager.py import-sources <project_path> <file>`
 - Standalone `convert_pdf.py` / `mineru_to_md.py` is only for exceptional repair flows, and must use `-o <project_path>/sources/<name>.md`
 
 ```bash
 python3 scripts/source_to_md/mineru_to_md.py paper.pdf -o projects/demo/sources/paper.md
+python3 scripts/source_to_md/mineru_to_md.py report.docx -o projects/demo/sources/report.md
 python3 scripts/source_to_md/mineru_to_md.py paper.pdf -o projects/demo/sources/paper.md --is-ocr
 python3 scripts/source_to_md/mineru_to_md.py mineru_result.zip --from-zip -o projects/demo/sources/paper.md
 python3 scripts/project_manager.py import-sources projects/demo paper.pdf --move
@@ -32,6 +33,7 @@ MINERU_API_BASE_URL=https://mineru.net/api/v4
 ## `source_to_md/doc_to_md.py`
 
 Hybrid converter: pure-Python for the common formats, pandoc fallback for the rest.
+Serves as the local fallback for `.docx` when MinerU is unavailable or fails.
 
 Native path (no external binary required):
 - `.docx` — via `mammoth`

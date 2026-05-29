@@ -28,9 +28,7 @@ import json
 import os
 import shutil
 import socket
-import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 _SCRIPTS_DIR = Path(__file__).resolve().parent
@@ -38,8 +36,12 @@ _SKILL_DIR = _SCRIPTS_DIR.parent
 _REPO_ROOT = _SKILL_DIR.parent.parent
 _ICON_DIR = _SKILL_DIR / "templates" / "icons"
 
-# Minimum Python version
-MIN_PYTHON = (3, 10)
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+from python_env import detect_python_command  # noqa: E402
+from python_env import MIN_PYTHON  # noqa: E402
+from pipeline_state import update_pipeline_state  # noqa: E402
 
 # Required and optional pip packages
 REQUIRED_PACKAGES = [
@@ -71,37 +73,6 @@ DEFAULT_PREVIEW_PORT = 5050
 # ------------------------------------------------------------------
 # Check helpers — each returns (passed: bool, message: str)
 # ------------------------------------------------------------------
-
-def detect_python_command() -> str:
-    """Detect a working Python >= 3.10 command for this system.
-
-    Tries candidates in order: python3, python, py -3.
-    On Windows the Microsoft Store ``python3.exe`` alias returns exit
-    code 49 when no real install backs it, so we verify each candidate
-    actually runs and reports a valid version.
-
-    Returns the first working command string (e.g. ``python3``,
-    ``python``, or ``py -3``).  Raises RuntimeError if none works.
-    """
-    candidates = ["python3", "python", "py -3"]
-    for cmd in candidates:
-        try:
-            parts = cmd.split()
-            result = subprocess.run(
-                [*parts, "-c", "import sys; print(sys.version_info[:2])"],
-                capture_output=True, text=True, timeout=10,
-            )
-            if result.returncode != 0:
-                continue
-            version_tuple = eval(result.stdout.strip())  # e.g. (3, 11)
-            if version_tuple >= MIN_PYTHON:
-                return cmd
-        except (FileNotFoundError, subprocess.TimeoutExpired, Exception):
-            continue
-    raise RuntimeError(
-        "No working Python >= 3.10 found. Tried: " + ", ".join(candidates)
-    )
-
 
 def _check_python_version() -> tuple[bool, str]:
     v = sys.version_info
@@ -348,6 +319,15 @@ def print_report(report: dict[str, object]) -> None:
     print(f"\nPYTHON_CMD={python_cmd}", file=sys.stderr)
 
 
+def _looks_like_project_dir(project_path: str) -> bool:
+    """Return True when the path appears to be a PPT Master project."""
+    project_dir = Path(project_path)
+    if not project_dir.is_dir():
+        return False
+    markers = ("sources", "svg_output", "design_spec.md", "spec_lock.md")
+    return any((project_dir / marker).exists() for marker in markers)
+
+
 # ------------------------------------------------------------------
 # CLI
 # ------------------------------------------------------------------
@@ -385,6 +365,19 @@ def main(argv: list[str] | None = None) -> int:
 
     report = run_preflight(args.project, preview_port=args.preview_port, fix=args.fix)
     print_report(report)
+
+    failed = [c for c in report.get("checks", []) if not c.get("passed")]
+    if _looks_like_project_dir(args.project):
+        update_pipeline_state(
+            args.project,
+            "preflight",
+            "done" if report.get("all_passed") else "failed",
+            detail=f"{len(failed)} issue(s)",
+            extra={
+                "python_cmd": report.get("python_cmd", "python3"),
+                "strict": bool(args.strict),
+            },
+        )
 
     if args.json:
         print(json.dumps(report, ensure_ascii=False, indent=2))

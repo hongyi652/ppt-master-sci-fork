@@ -13,13 +13,13 @@ description: >
 
 ## Python Command Detection (MANDATORY — run before any script)
 
-All command examples below use `python3` as a placeholder. On Windows, `python3` often points to a Microsoft Store stub that silently fails (exit code 49). **Before the first script call in every session**, detect the working Python command:
+All command examples below use `python3` as a placeholder. On Windows, `python3` / `python` can print a version and still fail when asked to run code. **Before the first script call in every session**, detect a Python command that can execute a tiny script:
 
 ```bash
-# Try in order — use the first one that prints a version:
-python3 --version      # Linux / macOS / some Windows
-python --version       # Some Windows installs
-py -3 --version        # Windows Python Launcher (most reliable on Windows)
+# Try in order — use the first one that prints OK:
+python3 -c "print('OK')"      # Linux / macOS / some Windows
+python -c "print('OK')"       # Some Windows installs
+py -3 -c "print('OK')"        # Windows Python Launcher (most reliable on Windows)
 ```
 
 Store the result as `PYTHON` and use `${PYTHON}` for all subsequent commands. Example:
@@ -46,16 +46,13 @@ ${PYTHON} ${SKILL_DIR}/scripts/preflight_check.py <project_path>
 > 7. **SEQUENTIAL PAGE GENERATION ONLY** — In Executor Step 6, after the global design context is confirmed, SVG pages MUST be generated sequentially page by page in one continuous pass. Grouped page batches (for example, 5 pages at a time) are FORBIDDEN
 > 8. **SPEC_LOCK RE-READ PER PAGE** — Before generating each SVG page, Executor MUST `read_file <project_path>/spec_lock.md`. All colors / fonts / icons / images MUST come from this file — no values from memory or invented on the fly. Executor MUST also look up the current page's `page_rhythm` (`anchor` / `dense` / `breathing`), `page_layouts` (which template SVG to inherit, if any), and `page_charts` (which chart template to adapt, if any). Empty / absent entries are intentional Strategist signals — see executor-base.md §2.1. This rule exists to resist context-compression drift on long decks and to break the uniform "every page is a card grid" default
 > 9. **SVG MUST BE HAND-WRITTEN, NOT SCRIPT-GENERATED** — Every SVG page is written by the main agent directly, one page at a time (see rules 6 and 7). Writing or running a Python / Node / shell script that produces the SVG files in batch — looping over pages, templating from data, or emitting them via a generator — is FORBIDDEN, including under "save tokens", "quick draft", or "user is in a hurry" pretexts. The script-generation path was tried on a feature branch and abandoned: cross-page visual consistency depends on per-page authoring with full upstream context, which a generator script cannot reproduce
-> 10. **⛔ IRON RULE — NO PLAIN-TEXT FORMULAS / SVG-FIRST** — Raw formula-like patterns (`a_1`, `x^2`, `a/b`, `√x`, bare `²`) in `<text>` / `<tspan>` without proper rendering are a **blocking error**. **Placing the base and exponent/subscript in separate `<text>` elements to fake sub/superscripts is FORBIDDEN.** Full rules in [`shared-standards.md §4.1`](references/shared-standards.md).
->    - **DEFAULT: Tier B — SVG image** — ALL mathematical formulas, including simple sub/superscripts like 10², H₂O, Tₑ, MUST be rendered as SVG images via `latex_to_svg.py` and embedded as `<image>`. This is the **only** approach the AI should use unless Tier A conditions are explicitly met.
+> 10. **⛔ IRON RULE — NO PLAIN-TEXT FORMULAS / SVG-FIRST** — Raw formula-like patterns (`a_1`, `x^2`, `a/b`, `√x`, bare `²`) in `<text>` / `<tspan>` without proper rendering are a **blocking error**. **Placing the base and exponent/subscript in separate `<text>` elements to fake sub/superscripts is FORBIDDEN.** Full tier definitions and conditions in [`shared-standards.md §4.1`](references/shared-standards.md).
+>    - **Workflow command** (Tier B default):
 >      ```
 >      ${PYTHON} ${SKILL_DIR}/scripts/latex_to_svg.py "10^{2}" -o <project_path>/images/formula_inline_<NNN>.svg --source-file <page_or_note_file> --line-number <N> --context "<surrounding text>"
 >      ```
 >      Then embed: `<image href="../images/formula_inline_<NNN>.svg" .../>`. Counter `<NNN>` from 901.
 >      When the formula is generated ad hoc during page execution, pass `--source-file`, `--line-number`, and `--context` whenever that information is available so the SVG and `formula_manifest.json` carry the same semantic metadata as manifest-rendered formulas.
->    - **EXCEPTION ONLY: Tier A — baseline-shift** — permitted ONLY when ALL of: (a) the expression is a single sub/superscript of 1–2 characters on a single base, (b) it appears **inline in a prose sentence** where an `<image>` element would break text flow (e.g. "扩散系数 D 的单位为 m²/s"), (c) no other formula on the same page uses Tier A (one Tier A per page maximum to keep things consistent). If in doubt, use Tier B.
->    - **Inline super/sub = one text frame** — for inline prose/unit cases like `m^-3`, `cm^-3`, `H₂O`, `Tₑ`, Tier A still means a **single** parent `<text>` / one PowerPoint text frame with an inline `<tspan baseline-shift>`. Never fake this with separate tiny `<text>` elements. This does **not** relax the Tier B default; it only bans the split-text-box workaround.
->    - **Formula SVG readable-size floor** — when using Tier B `<image>`, `notes/formula_asset_table.md` `Recommended display` is the minimum readable size, not an aspirational target. Do not shrink formulas below that floor to protect surrounding bullets; make room or split the page instead.
 >    - **Per-page mandatory pre-scan**: before writing each page, scan ALL planned text for formula-like tokens. For each one, call `latex_to_svg.py` to generate the SVG **before** writing the page SVG. Raw patterns without `<image>` → blocking error. **Never split a formula across multiple `<text>` elements.** `svg_quality_checker.py` detects violations as **errors**.
 >    - **⛔ FORBIDDEN — formula avoidance by text substitution**: when the quality checker flags a formula violation, the ONLY acceptable fix is to **generate an SVG image** via `latex_to_svg.py`. Replacing the formula with plain-text descriptions (e.g. `φ_burst` → "破裂填充比"), removing mathematical notation (e.g. `x/y` → "x与y"), or substituting an equation with a vague label (e.g. `P = C₁ε^C₂ / (1+C₃ε^C₄)` → "四参数 S 型曲线") is **strictly forbidden**. These workarounds destroy the scientific meaning of the slide content.
 > 11. **⛔ IRON RULE — NEVER MODIFY OR DELETE USER SOURCE FILES** — User-provided original documents (PDF, DOCX, PPTX, XLSX, etc.) MUST **never** be deleted, moved, or modified. `import-sources` always **copies** original documents into `sources/` regardless of the `--move` flag. Only generated intermediate files (Step 1 Markdown output, `_files/` companion dirs) may be moved. If the original file disappears after the workflow, that is a critical bug.
@@ -88,10 +85,11 @@ ${PYTHON} ${SKILL_DIR}/scripts/preflight_check.py <project_path>
 
 | Script | Purpose |
 |--------|---------|
-| `${SKILL_DIR}/scripts/source_to_md/mineru_to_md.py` | PDF/file parsing to Markdown + image assets via MinerU |
-| `${SKILL_DIR}/scripts/source_to_md/doc_to_md.py` | Documents to Markdown — native Python for DOCX/HTML/EPUB/IPYNB, pandoc fallback for legacy formats (.doc/.odt/.rtf/.tex/.rst/.org/.typ) |
-| `${SKILL_DIR}/scripts/source_to_md/excel_to_md.py` | Excel workbooks to Markdown — supports .xlsx/.xlsm; legacy .xls should be resaved as .xlsx |
-| `${SKILL_DIR}/scripts/source_to_md/ppt_to_md.py` | PowerPoint to Markdown |
+| `${SKILL_DIR}/scripts/source_to_md/mineru_to_md.py` | Document parsing to Markdown + image assets via MinerU (PDF/DOCX/PPTX/XLSX/images) |
+| `${SKILL_DIR}/scripts/convert_pdf.py` | MinerU stable wrapper: proxy/SSL, retry, report — accepts all MinerU-supported formats |
+| `${SKILL_DIR}/scripts/source_to_md/doc_to_md.py` | Documents to Markdown — native Python for DOCX/HTML/EPUB/IPYNB, pandoc fallback for legacy formats (.doc/.odt/.rtf/.tex/.rst/.org/.typ). Fallback when MinerU unavailable for DOCX |
+| `${SKILL_DIR}/scripts/source_to_md/excel_to_md.py` | Excel workbooks to Markdown — supports .xlsx/.xlsm; legacy .xls should be resaved as .xlsx. Fallback when MinerU unavailable for XLSX |
+| `${SKILL_DIR}/scripts/source_to_md/ppt_to_md.py` | PowerPoint to Markdown. Fallback when MinerU unavailable for PPTX |
 | `${SKILL_DIR}/scripts/source_to_md/web_to_md.py` | Web page to Markdown (supports WeChat via `curl_cffi`) |
 | `${SKILL_DIR}/scripts/project_manager.py` | Project init / validate / manage |
 | `${SKILL_DIR}/scripts/analyze_images.py` | Image analysis |
@@ -99,6 +97,7 @@ ${PYTHON} ${SKILL_DIR}/scripts/preflight_check.py <project_path>
 | `${SKILL_DIR}/scripts/extract_formulas.py` | Extract LaTeX formulas from MinerU Markdown into formula_manifest.json |
 | `${SKILL_DIR}/scripts/latex_to_svg.py` | Convert LaTeX formulas to SVG (single or manifest batch mode) |
 | `${SKILL_DIR}/scripts/svg_quality_checker.py` | SVG quality check |
+| `${SKILL_DIR}/scripts/postprocess.py` | Post-processing pipeline wrapper (split → finalize → export) |
 | `${SKILL_DIR}/scripts/total_md_split.py` | Speaker notes splitting |
 | `${SKILL_DIR}/scripts/finalize_svg.py` | SVG post-processing (unified entry) |
 | `${SKILL_DIR}/scripts/svg_to_pptx.py` | Export to PPTX |
@@ -545,6 +544,11 @@ ${PYTHON} ${SKILL_DIR}/scripts/svg_quality_checker.py <project_path>
 
 > ⚠️ Run the three sub-steps **one at a time** — each must complete successfully before the next.
 > ❌ **NEVER** combine them into a single code block or shell invocation.
+>
+> **One-command alternative** — `postprocess.py` wraps all three steps with error short-circuit:
+> ```bash
+> ${PYTHON} ${SKILL_DIR}/scripts/postprocess.py <project_path>
+> ```
 
 Canonical three-command pipeline (mirrors `references/shared-standards.md` §5):
 

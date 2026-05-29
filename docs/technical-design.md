@@ -112,7 +112,7 @@ Source documents (PDF / DOCX / EPUB / XLSX / PPTX / web pages) are normalized in
 
 ## Project Structure & Lifecycle
 
-The non-obvious bit of the project layout is `import-sources`'s **asymmetric default**: files outside the repo are *copied* in (preserving the user's original), files inside the repo are *moved* in (so intermediate artifacts don't get committed by accident). The asymmetry tracks the natural risk profile — outside-repo files are typically user assets we shouldn't disturb, inside-repo files are typically transient artifacts that should be cleaned up. A single uniform default would get one or the other case wrong every time.
+The non-obvious bit of the project layout is `import-sources`'s **source-protection split**: user-provided original documents (`.pdf`, `.docx`, `.pptx`, `.xlsx`, etc.) are always *copied* into `sources/`, even when `--move` is passed. Generated intermediates such as Markdown files and companion `_files/` directories may be moved when the operator requests cleanup. Files already inside the repo are also moved by default unless `--copy` is passed, so temporary artifacts do not accidentally become commit candidates. The split tracks the natural risk profile — user assets are protected, generated artifacts can be cleaned up.
 
 ---
 

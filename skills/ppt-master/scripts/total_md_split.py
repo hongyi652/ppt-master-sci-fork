@@ -123,7 +123,7 @@ def find_svg_files(project_path: Path) -> list[Path]:
     svg_dir = project_path / 'svg_output'
 
     if not svg_dir.exists():
-        print(f"Error: {svg_dir} directory does not exist")
+        print(f"Error: {svg_dir} directory does not exist", file=sys.stderr)
         return []
 
     return sorted(svg_dir.glob('*.svg'))
@@ -144,14 +144,14 @@ def parse_total_md(
         Dictionary where key is the level-1 heading (without #) and value is the notes content
     """
     if not md_path.exists():
-        print(f"Error: {md_path} file does not exist")
+        print(f"Error: {md_path} file does not exist", file=sys.stderr)
         return {}
 
     try:
         with open(md_path, 'r', encoding='utf-8') as f:
             content = f.read()
     except Exception as e:
-        print(f"Error: Unable to read file {md_path}: {e}")
+        print(f"Error: Unable to read file {md_path}: {e}", file=sys.stderr)
         return {}
 
     svg_stems = svg_stems or []
@@ -240,7 +240,7 @@ def split_notes(notes: dict[str, str], output_dir: Path, verbose: bool = True) -
         Whether successful
     """
     if not notes:
-        print("Error: No notes content found")
+        print("Error: No notes content found", file=sys.stderr)
         return False
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -297,7 +297,7 @@ Features:
 
     project_path = Path(args.project_path)
     if not project_path.exists():
-        print(f"Error: Path does not exist: {project_path}")
+        print(f"Error: Path does not exist: {project_path}", file=sys.stderr)
         sys.exit(1)
 
     # Determine output directory
@@ -319,7 +319,7 @@ Features:
     svg_files = find_svg_files(project_path)
 
     if not svg_files:
-        print("Error: No SVG files found")
+        print("Error: No SVG files found", file=sys.stderr)
         sys.exit(1)
 
     if verbose:
@@ -331,7 +331,7 @@ Features:
     notes = parse_total_md(total_md_path, svg_stems, verbose)
 
     if not notes:
-        print("Error: No notes content found")
+        print("Error: No notes content found", file=sys.stderr)
         sys.exit(1)
 
     if verbose:
@@ -342,8 +342,8 @@ Features:
     all_match, missing_notes = check_svg_note_mapping(svg_files, notes)
 
     if not all_match:
-        print("Error: SVG files and notes do not match")
-        print(f"  Missing notes: {', '.join(missing_notes)}")
+        print("Error: SVG files and notes do not match", file=sys.stderr)
+        print(f"  Missing notes: {', '.join(missing_notes)}", file=sys.stderr)
         print("\nPlease regenerate the notes file to ensure every SVG has corresponding notes.")
         sys.exit(1)
 

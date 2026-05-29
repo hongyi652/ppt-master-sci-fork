@@ -466,11 +466,13 @@ def estimate_text_width(text: str, font_size: float, font_weight: str = '400') -
             width += font_size * 0.75
         elif ch in 'iIlj1!|':
             width += font_size * 0.3
+        elif ch.isupper():
+            width += font_size * 0.65
         else:
             width += font_size * 0.55
 
     if font_weight in ('bold', '600', '700', '800', '900'):
-        width *= 1.05
+        width *= 1.10
 
     return width
 

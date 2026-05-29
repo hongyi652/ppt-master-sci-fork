@@ -137,7 +137,11 @@ def finalize_project(
 
     # Check if svg_output exists
     if not svg_output.exists():
-        safe_print(f"[ERROR] svg_output directory not found: {svg_output}")
+        safe_print(
+            f"[ERROR] svg_output directory not found: {svg_output}\n"
+            f"        Did Step 6 (Executor) complete successfully? "
+            f"SVG files must be generated before post-processing."
+        )
         return False
 
     # Get list of SVG files

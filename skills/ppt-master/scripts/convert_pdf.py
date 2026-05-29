@@ -1,20 +1,26 @@
 #!/usr/bin/env python3
 """
-PPT Master - PDF Conversion Wrapper
+PPT Master - MinerU Document Conversion Wrapper
 
 Stable wrapper around MinerU that handles proxy/SSL setup, automatic retry,
 zip preservation, and a conversion report.  When MinerU fails after all
 retries the script prints clear fallback instructions instead of a raw
 traceback.
 
+MinerU (v3.1+) natively supports: PDF, DOCX, PPTX, XLSX, and images.
+This script is format-agnostic — it uploads whatever file it receives and
+lets MinerU handle format detection.
+
 Usage:
-    python3 scripts/convert_pdf.py <file.pdf> -o <project_path>/sources/output.md
+    python3 scripts/convert_pdf.py <file> -o <project_path>/sources/output.md
     python3 scripts/convert_pdf.py <file.pdf> --retries 3 --keep-zip
-    python3 scripts/convert_pdf.py <file.pdf> --is-ocr --timeout 600
+    python3 scripts/convert_pdf.py <file.docx> --timeout 600
 
 Examples:
     python3 scripts/convert_pdf.py paper.pdf -o projects/demo/sources/paper.md
-    python3 scripts/convert_pdf.py paper.pdf -o projects/demo/sources/paper.md --keep-zip
+    python3 scripts/convert_pdf.py report.docx -o projects/demo/sources/report.md
+    python3 scripts/convert_pdf.py slides.pptx -o projects/demo/sources/slides.md
+    python3 scripts/convert_pdf.py data.xlsx -o projects/demo/sources/data.md
     python3 scripts/convert_pdf.py paper.pdf --retries 2 --is-ocr
 
 Dependencies:
@@ -232,10 +238,11 @@ def _print_fallback_instructions(error_message: str) -> None:
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser."""
     parser = argparse.ArgumentParser(
-        description="Stable MinerU PDF-to-Markdown wrapper with proxy setup, retry, and reporting.",
+        description="Stable MinerU document-to-Markdown wrapper with proxy setup, retry, and reporting. "
+                    "Supports PDF, DOCX, PPTX, XLSX, and images (MinerU v3.1+).",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("input", help="PDF file to convert.")
+    parser.add_argument("input", help="Document file to convert (PDF, DOCX, PPTX, XLSX, or image).")
     parser.add_argument(
         "-o",
         "--output",

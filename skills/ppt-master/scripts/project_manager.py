@@ -62,6 +62,10 @@ DOC_SUFFIXES = {
     ".tex", ".latex", ".rst", ".org",           # Academic / technical
     ".ipynb", ".typ",                           # Notebooks / Typst
 }
+# MinerU (v3.1+) natively supports these Office formats in addition to PDF.
+# When the MinerU API token is configured, these formats are tried via MinerU
+# first and fall back to the local converter on failure.
+MINERU_OFFICE_SUFFIXES = {".docx", ".pptx", ".xlsx"}
 WECHAT_HOST_KEYWORDS = ("mp.weixin.qq.com", "weixin.qq.com")
 IMAGE_ASSET_SUFFIXES = {
     ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".tif",
@@ -81,6 +85,7 @@ from latex_to_svg import (  # type: ignore
     process_manifest as process_formula_manifest,
     save_manifest as save_rendered_formula_manifest,
 )
+from pipeline_state import update_pipeline_state  # type: ignore
 from stabilize_image_assets import stabilize_assets as stabilize_image_assets  # type: ignore
 
 
@@ -91,6 +96,15 @@ def _curl_cffi_available() -> bool:
         return True
     except ImportError:
         return False
+
+
+def _mineru_token_available() -> bool:
+    """Return whether a MinerU API token is configured in the environment."""
+    return bool(
+        (os.environ.get("MINERU_API_TOKEN") or "").strip()
+        or (os.environ.get("MINERU_API_KEY") or "").strip()
+        or (os.environ.get("MINERU_TOKEN") or "").strip()
+    )
 
 
 def is_url(value: str) -> bool:
@@ -183,6 +197,14 @@ class ProjectManager:
             "exports",
         ):
             (project_path / rel_path).mkdir(parents=True, exist_ok=True)
+
+        # Copy reference templates so the Strategist has skeletons at hand.
+        _TEMPLATES_DIR = SKILL_DIR / "templates"
+        for ref_name in ("design_spec_reference.md", "spec_lock_reference.md"):
+            src = _TEMPLATES_DIR / ref_name
+            dst = project_path / "templates" / ref_name
+            if src.exists() and not dst.exists():
+                shutil.copy2(src, dst)
 
         canvas_info = self.CANVAS_FORMATS[normalized_format]
         readme_path = project_path / "README.md"
@@ -300,6 +322,21 @@ class ProjectManager:
                 sys.executable,
                 str(TOOLS_DIR / "convert_pdf.py"),
                 str(pdf_path),
+                "-o",
+                str(markdown_path),
+            ]
+        )
+
+    def _import_with_mineru(self, file_path: Path, markdown_path: Path) -> None:
+        """Convert a document via MinerU (convert_pdf.py wrapper).
+
+        Works for any format MinerU supports (PDF, DOCX, PPTX, XLSX, images).
+        """
+        self._run_tool(
+            [
+                sys.executable,
+                str(TOOLS_DIR / "convert_pdf.py"),
+                str(file_path),
                 "-o",
                 str(markdown_path),
             ]
@@ -872,7 +909,18 @@ class ProjectManager:
                 markdown_path = canonical_markdown_path
                 stage_start = _begin_stage("convert_presentation", str(archived_path))
                 try:
-                    self._import_presentation(archived_path, markdown_path)
+                    if suffix in MINERU_OFFICE_SUFFIXES and _mineru_token_available():
+                        try:
+                            self._import_with_mineru(archived_path, markdown_path)
+                        except Exception as mineru_exc:
+                            print(
+                                f"[WARN] MinerU failed for {archived_path.name}, "
+                                f"falling back to ppt_to_md.py: {mineru_exc}",
+                                file=sys.stderr,
+                            )
+                            self._import_presentation(archived_path, markdown_path)
+                    else:
+                        self._import_presentation(archived_path, markdown_path)
                     _finish_stage("convert_presentation", stage_start, detail=str(archived_path))
                     summary["markdown"].append(str(markdown_path))
                     self._propagate_companion_image_assets(markdown_path, project_dir)
@@ -902,7 +950,18 @@ class ProjectManager:
                 markdown_path = canonical_markdown_path
                 stage_start = _begin_stage("convert_excel", str(archived_path))
                 try:
-                    self._import_excel(archived_path, markdown_path)
+                    if suffix in MINERU_OFFICE_SUFFIXES and _mineru_token_available():
+                        try:
+                            self._import_with_mineru(archived_path, markdown_path)
+                        except Exception as mineru_exc:
+                            print(
+                                f"[WARN] MinerU failed for {archived_path.name}, "
+                                f"falling back to excel_to_md.py: {mineru_exc}",
+                                file=sys.stderr,
+                            )
+                            self._import_excel(archived_path, markdown_path)
+                    else:
+                        self._import_excel(archived_path, markdown_path)
                     _finish_stage("convert_excel", stage_start, detail=str(archived_path))
                     summary["markdown"].append(str(markdown_path))
                     self._propagate_companion_image_assets(markdown_path, project_dir)
@@ -941,7 +1000,18 @@ class ProjectManager:
                 markdown_path = canonical_markdown_path
                 stage_start = _begin_stage("convert_document", str(archived_path))
                 try:
-                    self._import_doc(archived_path, markdown_path)
+                    if suffix in MINERU_OFFICE_SUFFIXES and _mineru_token_available():
+                        try:
+                            self._import_with_mineru(archived_path, markdown_path)
+                        except Exception as mineru_exc:
+                            print(
+                                f"[WARN] MinerU failed for {archived_path.name}, "
+                                f"falling back to doc_to_md.py: {mineru_exc}",
+                                file=sys.stderr,
+                            )
+                            self._import_doc(archived_path, markdown_path)
+                    else:
+                        self._import_doc(archived_path, markdown_path)
                     _finish_stage("convert_document", stage_start, detail=str(archived_path))
                     summary["markdown"].append(str(markdown_path))
                     self._propagate_companion_image_assets(markdown_path, project_dir)
@@ -1191,6 +1261,18 @@ class ProjectManager:
                     expected_format = None
                 warnings.extend(validate_svg_viewbox(svg_files, expected_format))
 
+            # Report pipeline state if postprocess.py has written one.
+            state_path = project_path_obj / "pipeline_state.json"
+            if state_path.exists():
+                try:
+                    state = json.loads(state_path.read_text(encoding="utf-8"))
+                    steps = state.get("steps", {})
+                    if steps:
+                        parts = [f"{k}={v.get('status', '?')}" for k, v in steps.items()]
+                        warnings.append(f"Pipeline state: {', '.join(parts)}")
+                except (json.JSONDecodeError, OSError):
+                    warnings.append("Pipeline state: pipeline_state.json is malformed")
+
         return is_valid, errors, warnings
 
     def get_project_info(self, project_path: str) -> dict[str, object]:
@@ -1295,6 +1377,12 @@ def main() -> None:
         if command == "init":
             project_name, canvas_format, base_dir = parse_init_args(sys.argv)
             project_path = manager.init_project(project_name, canvas_format, base_dir=base_dir)
+            update_pipeline_state(
+                project_path,
+                "project_init",
+                "done",
+                detail=f"format={canvas_format}",
+            )
             print(f"[OK] Project initialized: {project_path}")
             print("Next:")
             print("1. Put source files into sources/ (or use import-sources)")
@@ -1310,6 +1398,18 @@ def main() -> None:
                 move=move,
                 copy=copy,
                 pdf_parser=pdf_parser,
+            )
+            update_pipeline_state(
+                project_path,
+                "import_sources",
+                "done",
+                detail=f"{len(sources)} source(s)",
+                extra={
+                    "archived_count": len(summary["archived"]),
+                    "markdown_count": len(summary["markdown"]),
+                    "asset_dir_count": len(summary["assets"]),
+                    "skipped_count": len(summary["skipped"]),
+                },
             )
             print(f"[OK] Imported sources into: {project_path}")
             if summary["archived"]:
@@ -1340,6 +1440,12 @@ def main() -> None:
 
             project_path = sys.argv[2]
             is_valid, errors, warnings = manager.validate_project(project_path)
+            update_pipeline_state(
+                project_path,
+                "project_validate",
+                "done" if is_valid else "failed",
+                detail=f"{len(errors)} error(s), {len(warnings)} warning(s)",
+            )
 
             print(f"\nProject validation: {project_path}")
             print("=" * 60)

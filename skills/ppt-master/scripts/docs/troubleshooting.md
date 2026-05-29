@@ -44,7 +44,7 @@ python3 scripts/finalize_svg.py <project_path>
 python3 scripts/svg_to_pptx.py <project_path>
 ```
 
-Do not export directly from `svg_output/` when `svg_final/` exists.
+Use the default `svg_to_pptx.py <project_path>` path. It reads `svg_output/` for the native editable PPTX and `svg_final/` only for the opt-in SVG snapshot.
 
 ## Recorded Narration Missing
 

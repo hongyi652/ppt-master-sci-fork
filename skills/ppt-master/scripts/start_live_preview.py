@@ -23,6 +23,7 @@ import argparse
 import json
 import os
 import signal
+import socket
 import subprocess
 import sys
 import time
@@ -54,7 +55,7 @@ def _process_alive(pid: int) -> bool:
         return False
     except PermissionError:
         return True
-    except OSError:
+    except (OSError, SystemError):
         return False
     return True
 
@@ -151,6 +152,19 @@ def _tail(path: Path, *, max_chars: int = 2000) -> str:
     return text[-max_chars:]
 
 
+def _is_port_available(port: int) -> bool:
+    """Return True if the TCP port is available for binding."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(("127.0.0.1", port))
+            return True
+    except OSError:
+        return False
+
+
+_PORT_FALLBACK_RANGE = 5  # try port, port+1, ..., port+4
+
+
 def _spawn_server(
     project_path: Path,
     *,
@@ -228,9 +242,29 @@ def main(argv: list[str] | None = None) -> int:
     _discard_unhealthy_matching_locks(project_path)
 
     log_path = project_path / ".preview" / "live_preview.log"
+    # Try the requested port and a few fallbacks if it's occupied.
+    chosen_port = args.port
+    if not _is_port_available(chosen_port):
+        for offset in range(1, _PORT_FALLBACK_RANGE):
+            candidate = args.port + offset
+            if _is_port_available(candidate):
+                print(
+                    f"Port {chosen_port} occupied, falling back to {candidate}",
+                    file=sys.stderr,
+                )
+                chosen_port = candidate
+                break
+        else:
+            print(
+                f"error: ports {args.port}–{args.port + _PORT_FALLBACK_RANGE - 1} "
+                f"are all occupied",
+                file=sys.stderr,
+            )
+            return 1
+
     process = _spawn_server(
         project_path,
-        port=args.port,
+        port=chosen_port,
         idle_timeout=args.timeout,
         log_path=log_path,
     )

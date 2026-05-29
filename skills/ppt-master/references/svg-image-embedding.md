@@ -49,7 +49,7 @@ Defined in the Design Specification & Content Outline; each image carries an `Ac
 5. Post-processing & Export → follow shared-standards.md §5
 ```
 
-> Keep external references in `svg_output/` during generation. `finalize_svg.py` auto-embeds images into `svg_final/`; export PPTX from `svg_final/`.
+> Keep external references in `svg_output/` during generation. `finalize_svg.py` auto-embeds images into `svg_final/` for SVG preview/snapshot use; the default native PPTX export still reads `svg_output/` and embeds media through DrawingML.
 
 ---
 
@@ -121,7 +121,7 @@ python3 -m http.server -d <project_path> 8000
 
 ## Conversion Process
 
-Use the unified pipeline in [shared-standards.md §5](shared-standards.md). `finalize_svg.py` runs before export so image references in `svg_output/` become embedded assets in `svg_final/`.
+Use the unified pipeline in [shared-standards.md §5](shared-standards.md). `finalize_svg.py` runs before export so image references in `svg_output/` become embedded assets in `svg_final/` for the snapshot path; native export keeps using `svg_output/`.
 
 ```bash
 python3 scripts/finalize_svg.py <project_path>

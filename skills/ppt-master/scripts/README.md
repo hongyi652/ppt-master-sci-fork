@@ -23,9 +23,9 @@ python3 scripts/source_to_md/ppt_to_md.py <deck.pptx>
 python3 scripts/source_to_md/excel_to_md.py <workbook.xlsx>
 python3 scripts/project_manager.py init <project_name> --format ppt169
 python3 scripts/project_manager.py import-sources <project_path> <source_files...> --move
+python3 scripts/preflight_check.py <project_path> --json
 python3 scripts/total_md_split.py <project_path>
 python3 scripts/finalize_svg.py <project_path>
-python3 scripts/animation_config.py scaffold <project_path>  # optional object-level animation overrides
 python3 scripts/svg_to_pptx.py <project_path>
 ```
 
@@ -52,11 +52,11 @@ python3 scripts/update_repo.py
 Conversion:
 
 ```bash
-python3 scripts/convert_pdf.py <file.pdf>                    # stable wrapper: proxy setup + retry + report
-python3 scripts/source_to_md/mineru_to_md.py <file.pdf>      # direct MinerU call
-python3 scripts/source_to_md/ppt_to_md.py <deck.pptx>
-python3 scripts/source_to_md/doc_to_md.py <file.docx>
-python3 scripts/source_to_md/excel_to_md.py <workbook.xlsx>
+python3 scripts/convert_pdf.py <file>                        # MinerU wrapper: PDF/DOCX/PPTX/XLSX, proxy + retry + report
+python3 scripts/source_to_md/mineru_to_md.py <file>          # direct MinerU call (PDF/DOCX/PPTX/XLSX/images)
+python3 scripts/source_to_md/ppt_to_md.py <deck.pptx>        # local fallback for PPTX
+python3 scripts/source_to_md/doc_to_md.py <file.docx>        # local fallback for DOCX
+python3 scripts/source_to_md/excel_to_md.py <workbook.xlsx>   # local fallback for XLSX
 python3 scripts/source_to_md/web_to_md.py <url>
 ```
 
@@ -106,7 +106,7 @@ python3 scripts/update_repo.py --skip-pip
 - Keep one user-facing entry point per workflow at the top level of `scripts/`
 - Move provider-specific or helper internals into subdirectories
 - Prefer the unified entry points `project_manager.py`, `finalize_svg.py`, and `image_gen.py`
-- Prefer `svg_final/` over `svg_output/` when exporting
+- Use the default `svg_to_pptx.py <project_path>` export path: native PPTX reads `svg_output/`, while the opt-in SVG snapshot reads `svg_final/`
 
 ## Related Docs
 

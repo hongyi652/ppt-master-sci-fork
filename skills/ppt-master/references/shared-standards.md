@@ -510,7 +510,7 @@ python3 scripts/total_md_split.py <project_path>
 # 2. SVG post-processing (icon embedding, image crop/embed, text flattening, rounded rect to path)
 python3 scripts/finalize_svg.py <project_path>
 
-# 3. Export PPTX (from svg_final/, embeds speaker notes by default)
+# 3. Export PPTX (default split: native reads svg_output/, SVG snapshot reads svg_final/)
 python3 scripts/svg_to_pptx.py <project_path>
 # Output (default-flow mode):
 #   exports/<project_name>_<timestamp>.pptx           ← native pptx (canonical output)
@@ -521,8 +521,8 @@ python3 scripts/svg_to_pptx.py <project_path>
 ```
 
 **Optional animation flags** (only when the user asks):
-- `-t <effect>` — page transition (`fade` / `push` / `wipe` / `split` / `strips` / `cover` / `random` / `none`; default `fade`)
-- `-a <effect>` — per-element entrance animation (`fade` / `auto` / `mixed` / `random` / one of 22 named effects / `none`; default `auto`, maps effect from group id — image-like ids cycle zoom/dissolve/circle/box/diamond/wheel, other matches map to a single effect, unmatched ids cycle fade/wipe/fly/zoom). Anchors on top-level `<g id="...">` groups.
+- `-t <effect>` — page transition (`none` / `fade` / `push` / `wipe` / `split` / `strips` / `cover` / `random`; default `none`)
+- `-a <effect>` — per-element entrance animation (`none` / `fade` / `auto` / `mixed` / `random` / named effects; default `none`). Anchors on top-level `<g id="...">` groups.
 - `--animation-trigger {on-click,with-previous,after-previous}` — Start mode matching PowerPoint's animation-pane Start dropdown. Default `after-previous` (cascade on slide entry; pace via `--animation-stagger <seconds>`); `on-click` advances per click; `with-previous` plays all groups together.
 - `--animation-config <path>` — optional object-level animation sidecar. Default: `<project>/animations.json` when present.
 - `--auto-advance <seconds>` — kiosk-style auto-play

@@ -5,12 +5,19 @@ PPT Master - MinerU to Markdown Converter
 Parse a source file with MinerU, normalize the returned bundle to Markdown,
 and keep extracted images in a sibling `<output>_files/` directory.
 
+MinerU (v3.1+) natively supports: PDF, DOCX, PPTX, XLSX, and images.
+This script is format-agnostic — it uploads whatever file it receives
+and lets MinerU handle format detection.
+
 Usage:
-    python3 scripts/source_to_md/mineru_to_md.py <file.pdf> -o <project_path>/sources/<name>.md
+    python3 scripts/source_to_md/mineru_to_md.py <file> -o <project_path>/sources/<name>.md
     python3 scripts/source_to_md/mineru_to_md.py mineru_result.zip --from-zip -o <project_path>/sources/<name>.md
 
 Examples:
     python3 scripts/source_to_md/mineru_to_md.py paper.pdf -o projects/demo/sources/paper.md
+    python3 scripts/source_to_md/mineru_to_md.py report.docx -o projects/demo/sources/report.md
+    python3 scripts/source_to_md/mineru_to_md.py slides.pptx -o projects/demo/sources/slides.md
+    python3 scripts/source_to_md/mineru_to_md.py data.xlsx -o projects/demo/sources/data.md
     python3 scripts/source_to_md/mineru_to_md.py paper.pdf -o projects/demo/sources/paper.md --is-ocr
     python3 scripts/source_to_md/mineru_to_md.py mineru_result.zip --from-zip -o projects/demo/sources/paper.md
 
@@ -506,10 +513,11 @@ def convert_with_mineru(
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser."""
     parser = argparse.ArgumentParser(
-        description="Parse a file with MinerU and normalize the result to Markdown.",
+        description="Parse a file with MinerU and normalize the result to Markdown. "
+                    "Supports PDF, DOCX, PPTX, XLSX, and images (MinerU v3.1+).",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("input", help="Source file to parse, or an existing MinerU result zip.")
+    parser.add_argument("input", help="Source file to parse (PDF, DOCX, PPTX, XLSX, image), or an existing MinerU result zip.")
     parser.add_argument("-o", "--output", help="Output Markdown path.")
     parser.add_argument(
         "--from-zip",

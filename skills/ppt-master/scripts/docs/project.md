@@ -16,12 +16,10 @@ python3 scripts/project_manager.py info <project_path>
 ```
 
 Notes:
-- Files outside the repo are copied into `sources/` by default
-- With `--move`, files outside the repo are moved into `sources/`
-- Files already inside the repo are moved into `sources/` by default (with a stderr
-  note), to avoid leaving unintended artifacts that could be committed by mistake.
-  Pass `--copy` to force a copy for in-repo sources instead.
-- `--move` and `--copy` are mutually exclusive.
+- User-provided original documents (`.pdf`, `.docx`, `.pptx`, `.xlsx`, etc.) are always copied into `sources/`, even when `--move` is passed.
+- Generated intermediates such as Markdown files and companion `_files/` directories may be moved when `--move` is passed.
+- Files already inside the repo are moved into `sources/` by default (with a stderr note), to avoid leaving unintended artifacts that could be committed by mistake. Pass `--copy` to force a copy for in-repo sources instead.
+- `--move` and `--copy` are mutually exclusive; `--move` never overrides original-document protection.
 - `import-sources` is the preferred entry point for PDFs, Office docs, PPTX, Excel, and URLs because it keeps converted Markdown, companion `_files/` directories, and conversion reports inside the project tree instead of beside the original source file.
 
 Common formats:

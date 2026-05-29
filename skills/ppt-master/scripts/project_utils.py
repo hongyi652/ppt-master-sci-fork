@@ -302,6 +302,21 @@ def validate_project_structure(project_path: str, verbose: bool = False) -> Tupl
                 ErrorHelper.format_error_message('missing_date_suffix')
         warnings.append(msg)
 
+    # Check spec_lock.md schema (required sections)
+    spec_lock = project_path / "spec_lock.md"
+    if spec_lock.is_file():
+        try:
+            lock_text = spec_lock.read_text(encoding="utf-8").lower()
+            required_sections = ("## canvas", "## colors", "## typography")
+            missing = [s for s in required_sections if s not in lock_text]
+            if missing:
+                warnings.append(
+                    f"spec_lock.md missing required section(s): "
+                    f"{', '.join(missing)}"
+                )
+        except OSError:
+            warnings.append("spec_lock.md exists but could not be read")
+
     is_valid = len(errors) == 0
     return is_valid, errors, warnings
 

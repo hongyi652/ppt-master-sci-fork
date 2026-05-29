@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import re
+import sys
 from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree as ET
@@ -504,6 +505,9 @@ def convert_svg_to_slide_shapes(
     # Per-element shape ids of every top-level child, used as an animation
     # fallback when no <g id="..."> groups are present at the root.
     fallback_targets: list = []
+    # Collect text frame bounding boxes (EMU) for overlap detection.
+    # Each entry: (x1, y1, x2, y2, shape_id, text_snippet)
+    text_boxes: list[tuple[int, int, int, int, int, str]] = []
 
     for child in root:
         tag = child.tag.replace(f'{{{SVG_NS}}}', '')
@@ -515,7 +519,15 @@ def convert_svg_to_slide_shapes(
             converted += 1
             m = re.search(r'<p:cNvPr id="(\d+)"', result.xml)
             if m:
-                fallback_targets.append((int(m.group(1)), tag))
+                shape_id = int(m.group(1))
+                fallback_targets.append((shape_id, tag))
+                if tag == 'text' and result.bounds_emu:
+                    snippet = (child.text or '').strip()
+                    if not snippet:
+                        snippet = ''.join(
+                            (t.text or '').strip() for t in child
+                        )[:40]
+                    text_boxes.append((*result.bounds_emu, shape_id, snippet[:40]))
         else:
             if tag not in _NON_VISUAL_TAGS:
                 skipped += 1
@@ -529,6 +541,54 @@ def convert_svg_to_slide_shapes(
     _ANIM_FALLBACK_CAP = 8
     if not ctx.anim_targets and 0 < len(fallback_targets) <= _ANIM_FALLBACK_CAP:
         ctx.anim_targets = fallback_targets
+
+    # Post-pass: detect significant vertical overlap between text frames.
+    # When two text boxes share >30 % of the shorter box's height on the
+    # same horizontal band, warn — that almost certainly means the baseline
+    # conversion or height estimation produced colliding frames.
+    _overlap_warnings: list[str] = []
+    for i in range(len(text_boxes)):
+        ax1, ay1, ax2, ay2, aid, a_txt = text_boxes[i]
+        ah = ay2 - ay1
+        aw = ax2 - ax1
+        if ah <= 0 or aw <= 0:
+            continue
+        for j in range(i + 1, len(text_boxes)):
+            bx1, by1, bx2, by2, bid, b_txt = text_boxes[j]
+            bh = by2 - by1
+            bw = bx2 - bx1
+            if bh <= 0 or bw <= 0:
+                continue
+            # Horizontal overlap — require ≥40 % of the narrower box's width
+            # to avoid false positives from same-y texts in different columns
+            # whose *estimated* widths accidentally touch.  Single-line text
+            # with spAutoFit will self-correct; the warning is most relevant
+            # for paragraph-mode frames whose size is fixed.
+            h_overlap = min(ax2, bx2) - max(ax1, bx1)
+            if h_overlap <= 0:
+                continue
+            narrower_w = min(aw, bw)
+            if h_overlap / narrower_w < 0.40:
+                continue
+            # Vertical overlap ratio relative to the shorter box.
+            v_overlap = min(ay2, by2) - max(ay1, by1)
+            if v_overlap <= 0:
+                continue
+            shorter_h = min(ah, bh)
+            if v_overlap / shorter_h > 0.30:
+                _overlap_warnings.append(
+                    f'Text frames #{aid} ("{a_txt}") and #{bid} ("{b_txt}") '
+                    f'overlap vertically by {v_overlap / shorter_h:.0%}'
+                )
+    if _overlap_warnings:
+        for w in _overlap_warnings[:5]:
+            print(f'  [WARN] {w}', file=sys.stderr)
+        if len(_overlap_warnings) > 5:
+            print(
+                f'  [WARN] ... and {len(_overlap_warnings) - 5} more '
+                f'text overlap(s)',
+                file=sys.stderr,
+            )
 
     if verbose:
         print(f'  Converted {converted} elements, skipped {skipped}')

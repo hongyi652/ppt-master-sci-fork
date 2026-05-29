@@ -11,6 +11,7 @@ Usage:
 """
 
 import io
+import contextlib
 import os
 import sys
 import re
@@ -43,10 +44,12 @@ if sys.platform == "win32":
 try:
     from project_utils import CANVAS_FORMATS
     from error_helper import ErrorHelper
+    from pipeline_state import update_pipeline_state
 except ImportError:
     print("Warning: Unable to import dependency modules")
     CANVAS_FORMATS = {}
     ErrorHelper = None
+    update_pipeline_state = None
 
 try:
     from update_spec import parse_lock as _parse_spec_lock
@@ -229,6 +232,7 @@ class SVGQualityChecker:
             'sizes': defaultdict(set),
         }
         self._lock_seen = False  # True once we locate at least one spec_lock.md
+        self._lock_path: Path | None = None  # resolved path of the first spec_lock.md found
         self._source_manifest_cache: Dict[Path, Dict] = {}
         self._formula_manifest_cache: Dict[Path, Dict[str, Dict]] = {}
         # Template-mode aggregation (populated by check_directory when
@@ -325,6 +329,11 @@ class SVGQualityChecker:
                 #     with <tspan> children for inline styling.
                 if not self.template_mode:
                     self._check_split_sentence(content, result)
+
+                # 13. Check breathing-page card-grid anti-pattern: 3+
+                #     same-sized rounded rects on a breathing page.
+                if not self.template_mode:
+                    self._check_breathing_card_grid(content, svg_path, result)
 
             # Determine pass/fail
             result['passed'] = len(result['errors']) == 0
@@ -914,6 +923,8 @@ class SVGQualityChecker:
                 self._lock_cache[candidate] = data
                 if data is not None:
                     self._lock_seen = True
+                    if self._lock_path is None:
+                        self._lock_path = candidate
                 return data
         return None
 
@@ -945,7 +956,15 @@ class SVGQualityChecker:
         if typo:
             default_font = typo.get('font_family', '').strip()
             if default_font:
-                allowed_fonts.add(default_font)
+                # Store both the full normalized stack and individual names so
+                # that SVG stacks like "Arial, 'Microsoft YaHei', sans-serif"
+                # match the spec_lock entry "Arial, \"Microsoft YaHei\",
+                # sans-serif" regardless of quoting style or subset ordering.
+                allowed_fonts.add(self._normalize_font(default_font))
+                for part in default_font.split(','):
+                    normed = self._normalize_font(part)
+                    if normed:
+                        allowed_fonts.add(normed)
             for k, v in typo.items():
                 if k == 'font_family' or not k.endswith('_family'):
                     continue
@@ -953,7 +972,11 @@ class SVGQualityChecker:
                 # Skip placeholder text like "same as body (omit if identical)"
                 if not v_clean or v_clean.lower().startswith('same as'):
                     continue
-                allowed_fonts.add(v_clean)
+                allowed_fonts.add(self._normalize_font(v_clean))
+                for part in v_clean.split(','):
+                    normed = self._normalize_font(part)
+                    if normed:
+                        allowed_fonts.add(normed)
 
         # Sizes: declared slots are anchors; body is the ramp baseline.
         allowed_sizes = set()
@@ -982,12 +1005,14 @@ class SVGQualityChecker:
             val = m.group(1).strip()
             if not allowed_fonts:
                 continue
-            # Font stacks like "'Microsoft YaHei', 'PingFang SC', sans-serif"
-            # match if ANY declared font name appears as a substring.
-            # This handles the common case where spec_lock stores a single
-            # family name but the SVG uses a full CSS fallback stack.
-            if val not in allowed_fonts and not any(f in val for f in allowed_fonts):
-                font_drifts.add(val)
+            val_norm = self._normalize_font(val)
+            if val_norm in allowed_fonts:
+                continue
+            # Split SVG font stack by comma and check each individual name.
+            svg_parts = {self._normalize_font(p) for p in val.split(',') if self._normalize_font(p)}
+            if svg_parts and svg_parts <= allowed_fonts:
+                continue
+            font_drifts.add(val)
 
         size_drifts = set()
         for m in re.finditer(r'font-size\s*=\s*["\']([^"\']+)["\']', content):
@@ -1183,6 +1208,16 @@ class SVGQualityChecker:
                     f"({license_token}). Add compact credit text per "
                     f"references/image-searcher.md §7."
                 )
+
+    @staticmethod
+    def _normalize_font(name: str) -> str:
+        """Normalize a font-family name for comparison.
+
+        Strips ALL quotes (single/double), trims whitespace, and lowercases
+        so ``"Microsoft YaHei"`` / ``'Microsoft YaHei'`` / ``Microsoft YaHei``
+        all compare equal.
+        """
+        return name.replace('"', '').replace("'", "").strip().lower()
 
     @staticmethod
     def _normalize_size(value: str) -> str:
@@ -1442,6 +1477,54 @@ class SVGQualityChecker:
         if len(text_elems) < 2:
             return
 
+        # Collect badge-like shapes (<circle>, <ellipse>, <rect rx>)
+        # so we can exempt page-number badges from the fake-superscript check.
+        badge_shapes: List[Dict] = []
+        for elem in root.iter():
+            local = elem.tag.split('}')[-1] if '}' in str(elem.tag) else str(elem.tag)
+            if local == 'circle':
+                try:
+                    cx = float(elem.get('cx', '0'))
+                    cy = float(elem.get('cy', '0'))
+                    r = float(elem.get('r', '0'))
+                    badge_shapes.append({
+                        'x1': cx - r, 'y1': cy - r,
+                        'x2': cx + r, 'y2': cy + r,
+                    })
+                except (ValueError, TypeError):
+                    pass
+            elif local == 'ellipse':
+                try:
+                    cx = float(elem.get('cx', '0'))
+                    cy = float(elem.get('cy', '0'))
+                    rx = float(elem.get('rx', '0'))
+                    ry = float(elem.get('ry', '0'))
+                    badge_shapes.append({
+                        'x1': cx - rx, 'y1': cy - ry,
+                        'x2': cx + rx, 'y2': cy + ry,
+                    })
+                except (ValueError, TypeError):
+                    pass
+            elif local == 'rect' and elem.get('rx'):
+                try:
+                    rx = float(elem.get('x', '0'))
+                    ry = float(elem.get('y', '0'))
+                    rw = float(elem.get('width', '0'))
+                    rh = float(elem.get('height', '0'))
+                    badge_shapes.append({
+                        'x1': rx, 'y1': ry,
+                        'x2': rx + rw, 'y2': ry + rh,
+                    })
+                except (ValueError, TypeError):
+                    pass
+
+        def _inside_badge(x: float, y: float) -> bool:
+            """Return True if (x, y) falls inside any collected badge shape."""
+            for s in badge_shapes:
+                if s['x1'] <= x <= s['x2'] and s['y1'] <= y <= s['y2']:
+                    return True
+            return False
+
         def _approx_text_width(text: str, font_size: float) -> float:
             width_units = 0.0
             for char in text:
@@ -1474,6 +1557,12 @@ class SVGQualityChecker:
 
                 # The exponent/subscript candidate must stay short.
                 if short['len'] > 3:
+                    continue
+
+                # Exempt page-number badges: short numeric text inside a
+                # decorative shape (circle / ellipse / rounded rect) is an
+                # intentional design element, not a fake superscript.
+                if short['text'].strip().isdigit() and _inside_badge(short['x'], short['y']):
                     continue
 
                 # The short element must be noticeably smaller.
@@ -1596,6 +1685,82 @@ class SVGQualityChecker:
                 f"elements on the same line ({' + '.join(previews)}) should "
                 f"be one <text> with <tspan> children for inline styling. "
                 f"Combined text: \"{combined[:80]}\""
+            )
+
+    # ------------------------------------------------------------------
+    # Breathing-page card-grid detection
+    # ------------------------------------------------------------------
+
+    def _check_breathing_card_grid(
+        self, content: str, svg_path: Path, result: Dict,
+    ):
+        """Warn if a breathing page contains 3+ same-sized rounded rects.
+
+        The ``page_rhythm`` section of ``spec_lock.md`` marks pages as
+        ``anchor``, ``dense``, or ``breathing``. Breathing pages should
+        avoid multi-card grid layouts. This heuristic counts ``<rect>``
+        elements with ``rx`` whose dimensions cluster within 5% tolerance.
+        """
+        lock = self._get_spec_lock(svg_path)
+        if lock is None:
+            return
+
+        rhythm_section = lock.get('page_rhythm', {})
+        if not rhythm_section:
+            return
+
+        # Map slide filename to page key, e.g. slide_03.svg → P03
+        stem = svg_path.stem  # e.g. "slide_03"
+        page_num = ''.join(c for c in stem if c.isdigit())
+        if not page_num:
+            return
+        page_key = f"P{page_num.zfill(2)}"
+
+        rhythm = rhythm_section.get(page_key, '').strip().lower()
+        if rhythm != 'breathing':
+            return
+
+        # Parse rounded rects from the SVG
+        try:
+            root = ET.fromstring(content)
+        except ET.ParseError:
+            return
+
+        rounded_rects: list[tuple[float, float]] = []
+        for elem in root.iter():
+            local = elem.tag.split('}')[-1] if '}' in str(elem.tag) else str(elem.tag)
+            if local != 'rect':
+                continue
+            if not elem.get('rx'):
+                continue
+            try:
+                w = float(elem.get('width', '0'))
+                h = float(elem.get('height', '0'))
+            except (ValueError, TypeError):
+                continue
+            if w > 0 and h > 0:
+                rounded_rects.append((w, h))
+
+        if len(rounded_rects) < 3:
+            return
+
+        # Cluster by 5% tolerance on both width and height
+        def _similar(a: tuple[float, float], b: tuple[float, float]) -> bool:
+            return (abs(a[0] - b[0]) <= max(a[0], b[0]) * 0.05
+                    and abs(a[1] - b[1]) <= max(a[1], b[1]) * 0.05)
+
+        largest_cluster = 1
+        for i, ref in enumerate(rounded_rects):
+            count = sum(1 for other in rounded_rects if _similar(ref, other))
+            if count > largest_cluster:
+                largest_cluster = count
+
+        if largest_cluster >= 3:
+            result['warnings'].append(
+                f"Breathing page {page_key} contains {largest_cluster} "
+                f"same-sized rounded rects — likely a card-grid layout. "
+                f"breathing pages should avoid multi-card grids; consider "
+                f"naked text, dividers, whitespace, or full-bleed imagery."
             )
 
     def _categorize_issue(self, error_msg: str) -> str:
@@ -2082,6 +2247,97 @@ class SVGQualityChecker:
             "     Rare ones are likely Executor drift — review the affected SVGs."
         )
 
+    def fix_lock(self) -> bool:
+        """Append drifted colors and fonts to spec_lock.md.
+
+        Returns True if the file was modified, False otherwise.
+        """
+        if self._lock_path is None or not self._lock_path.exists():
+            print("[fix-lock] No spec_lock.md found — nothing to fix.",
+                  file=sys.stderr)
+            return False
+        has_drift = any(self._drift_summary[cat] for cat in ('colors', 'fonts'))
+        if not has_drift:
+            return False
+
+        lines = self._lock_path.read_text(encoding="utf-8").splitlines()
+        modified = False
+
+        color_drifts = sorted(self._drift_summary.get('colors', {}))
+        font_drifts = sorted(self._drift_summary.get('fonts', {}))
+
+        # Find the ## palette section and append missing colors
+        if color_drifts:
+            palette_idx = None
+            next_section_idx = len(lines)
+            for i, line in enumerate(lines):
+                if line.strip().lower() in ('## colors', '## palette'):
+                    palette_idx = i
+                elif palette_idx is not None and line.startswith('## '):
+                    next_section_idx = i
+                    break
+            if palette_idx is not None:
+                insert_at = next_section_idx
+                additions = []
+                for j, color in enumerate(color_drifts):
+                    key = f"extra_{j + 1}"
+                    additions.append(f"- {key}: {color}")
+                for a in reversed(additions):
+                    lines.insert(insert_at, a)
+                modified = True
+                print(f"[fix-lock] Added {len(additions)} color(s) to ## colors")
+
+        # Find the ## typography section and append missing fonts
+        if font_drifts:
+            typo_idx = None
+            next_section_idx = len(lines)
+            for i, line in enumerate(lines):
+                if line.strip().lower() == '## typography':
+                    typo_idx = i
+                elif typo_idx is not None and line.startswith('## '):
+                    next_section_idx = i
+                    break
+            if typo_idx is not None:
+                insert_at = next_section_idx
+                additions = []
+                for j, font in enumerate(font_drifts):
+                    key = f"extra_family_{j + 1}"
+                    additions.append(f"- {key}: {font}")
+                for a in reversed(additions):
+                    lines.insert(insert_at, a)
+                modified = True
+                print(f"[fix-lock] Added {len(additions)} font(s) to ## typography")
+
+        if modified:
+            self._lock_path.write_text(
+                "\n".join(lines) + "\n", encoding="utf-8",
+            )
+            print(f"[fix-lock] Updated {self._lock_path}")
+        return modified
+
+    def to_json_report(self) -> Dict:
+        """Return a machine-readable report for automation."""
+        drift = {}
+        for category, values in self._drift_summary.items():
+            drift[category] = {
+                value: sorted(files)
+                for value, files in sorted(values.items())
+            }
+        return {
+            'summary': dict(self.summary),
+            'issue_types': dict(self.issue_types),
+            'results': self.results,
+            'template_issues': [
+                {'severity': severity, 'kind': kind, 'message': message}
+                for severity, kind, message in self._template_issues
+            ],
+            'animation_issues': [
+                {'severity': severity, 'message': message}
+                for severity, message in self._animation_issues
+            ],
+            'spec_lock_drift': drift,
+        }
+
     def _percentage(self, count: int) -> int:
         """Calculate percentage"""
         if self.summary['total'] == 0:
@@ -2141,65 +2397,145 @@ def print_usage() -> None:
     print("  python3 scripts/svg_quality_checker.py templates/layouts/academic_defense --template-mode")
     print("\nOptions:")
     print("  --format <ppt169|ppt43|...>   Expected canvas format")
+    print("  --fix-lock                    Auto-append drifted colors/fonts to spec_lock.md")
+    print("  --json                        Print machine-readable JSON report to stdout")
     print("  --template-mode               Validate a templates/layouts/<id> directory:")
     print("                                  glob *.svg directly, skip spec_lock checks,")
     print("                                  enforce roster ↔ design_spec.md Page Roster consistency,")
     print("                                  and emit advisory placeholder-convention warnings.")
 
 
+def _infer_project_path(target: str) -> Path | None:
+    """Infer a project root from a checker target."""
+    path = Path(target).resolve()
+    if path.is_file():
+        if path.parent.name == 'svg_output':
+            return path.parent.parent
+        return None
+    if not path.is_dir():
+        return None
+    if (path / 'svg_output').is_dir():
+        return path
+    if path.name == 'svg_output':
+        return path.parent
+    return None
+
+
+def _write_quality_state(target: str, checker: SVGQualityChecker) -> None:
+    """Record checker status in project-local pipeline_state.json."""
+    if update_pipeline_state is None:
+        return
+    project_path = _infer_project_path(target)
+    if project_path is None:
+        return
+    summary = dict(checker.summary)
+    total = int(summary.get('total', 0))
+    if total == 0:
+        status = 'skipped'
+    elif int(summary.get('errors', 0)) > 0:
+        status = 'failed'
+    else:
+        status = 'done'
+    update_pipeline_state(
+        project_path,
+        'svg_quality_check',
+        status,
+        detail=(
+            f"{summary.get('errors', 0)} error file(s), "
+            f"{summary.get('warnings', 0)} warning file(s)"
+        ),
+        extra={'summary': summary},
+    )
+
+
 def main() -> None:
     """Run the CLI entry point."""
-    if len(sys.argv) < 2:
+    argv = sys.argv[1:]
+    if not argv:
         print_usage()
         sys.exit(0)
 
-    if sys.argv[1] in {"-h", "--help", "help"}:
+    if any(arg in {"-h", "--help", "help"} for arg in argv):
         print_usage()
         sys.exit(0)
 
-    if sys.argv[1].startswith("--") and sys.argv[1] not in {"--all"}:
-        print(f"[ERROR] Missing target before option: {sys.argv[1]}")
-        print_usage()
-        sys.exit(1)
-
-    template_mode = '--template-mode' in sys.argv
+    template_mode = '--template-mode' in argv
+    fix_lock = '--fix-lock' in argv
+    json_output = '--json' in argv
     checker = SVGQualityChecker(template_mode=template_mode)
 
     # Parse arguments
-    target = sys.argv[1]
     expected_format = None
+    all_base_dir = 'examples'
+    target = None
 
-    if '--format' in sys.argv:
-        idx = sys.argv.index('--format')
-        if idx + 1 < len(sys.argv):
-            expected_format = sys.argv[idx + 1]
+    if '--format' in argv:
+        idx = argv.index('--format')
+        if idx + 1 < len(argv):
+            expected_format = argv[idx + 1]
+    if '--all' in argv:
+        target = '--all'
+        idx = argv.index('--all')
+        if idx + 1 < len(argv) and not argv[idx + 1].startswith('--'):
+            all_base_dir = argv[idx + 1]
+    else:
+        skip_next = False
+        for arg in argv:
+            if skip_next:
+                skip_next = False
+                continue
+            if arg in {'--format', '--output'}:
+                skip_next = True
+                continue
+            if arg.startswith('--'):
+                continue
+            target = arg
+            break
+
+    if target is None:
+        print("[ERROR] Missing SVG file, directory, or --all target")
+        print_usage()
+        sys.exit(1)
 
     # Execute check
-    if target == '--all':
-        # Check all example projects
-        base_dir = sys.argv[2] if len(sys.argv) > 2 else 'examples'
-        from project_utils import find_all_projects
-        projects = find_all_projects(base_dir)
+    output_stream = sys.stderr if json_output else sys.stdout
+    with contextlib.redirect_stdout(output_stream):
+        if target == '--all':
+            # Check all example projects
+            from project_utils import find_all_projects
+            projects = find_all_projects(all_base_dir)
 
-        for project in projects:
-            print(f"\n{'=' * 80}")
-            print(f"Checking project: {project.name}")
-            print('=' * 80)
-            checker.check_directory(str(project))
-    else:
-        checker.check_directory(target, expected_format)
+            for project in projects:
+                print(f"\n{'=' * 80}")
+                print(f"Checking project: {project.name}")
+                print('=' * 80)
+                checker.check_directory(str(project))
+        else:
+            checker.check_directory(target, expected_format)
 
-    # Print summary
-    checker.print_summary()
+        # Print summary. In JSON mode this goes to stderr so stdout remains
+        # machine-readable, but it still finalizes aggregate issue counts.
+        checker.print_summary()
+
+        # Auto-fix spec_lock drift (if requested)
+        if fix_lock:
+            checker.fix_lock()
+
+    if not template_mode and target != '--all':
+        _write_quality_state(target, checker)
 
     # Export report (if specified)
-    if '--export' in sys.argv:
+    if '--export' in argv:
         output_file = 'svg_quality_report.txt'
-        if '--output' in sys.argv:
-            idx = sys.argv.index('--output')
-            if idx + 1 < len(sys.argv):
-                output_file = sys.argv[idx + 1]
-        checker.export_report(output_file)
+        if '--output' in argv:
+            idx = argv.index('--output')
+            if idx + 1 < len(argv):
+                output_file = argv[idx + 1]
+        with contextlib.redirect_stdout(output_stream):
+            checker.export_report(output_file)
+
+    if json_output:
+        print(json.dumps(checker.to_json_report(), ensure_ascii=False, indent=2))
 
     # Return exit code
     if checker.summary['errors'] > 0:

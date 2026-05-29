@@ -1221,20 +1221,20 @@ def convert_text(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
         # Use the WIDEST visual line (per-tspan as the deck author drew it),
         # not the joined-up paragraph: soft-broken paragraphs concatenate
         # many lines into one <a:p>, and measuring the joined string would
-        # blow the textbox past the canvas. The 1.05 safety factor covers
+        # blow the textbox past the canvas. The 1.10 safety factor covers
         # PowerPoint's slightly different font metrics.
-        text_width = max(visual_line_widths) * 1.05 if visual_line_widths else 0.0
+        text_width = max(visual_line_widths) * 1.10 if visual_line_widths else 0.0
         # Total height assumes the visual line count from the SVG source;
         # if PowerPoint wraps to more or fewer lines after the user resizes,
         # the user resizes the height accordingly.
         text_height = (
             line_height_px * (len(visual_line_widths) - 1)
             + sum(paragraph_space_before)
-            + font_size * 1.5
+            + font_size * 1.2
         )
     else:
-        text_width = estimate_text_width(full_text, font_size, font_weight) * 1.15
-        text_height = font_size * 1.5
+        text_width = estimate_text_width(full_text, font_size, font_weight) * 1.10
+        text_height = font_size * 1.2
     padding = font_size * 0.1
 
     # Adjust position based on text-anchor
@@ -1245,7 +1245,13 @@ def convert_text(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
     else:
         box_x = x - padding
 
-    box_y = y - font_size * 0.85
+    # SVG y is the text baseline; PPTX frames anchor at the top-left.
+    # CJK fonts (e.g. Microsoft YaHei) have a higher ascent ratio (~0.88)
+    # than Latin fonts (e.g. Arial ~0.82).  Detect CJK-dominant text to
+    # pick the right factor so frames land closer to the intended position.
+    cjk_count = sum(1 for c in full_text if is_cjk_char(c))
+    ascent_factor = 0.88 if cjk_count > len(full_text) * 0.3 else 0.82
+    box_y = y - font_size * ascent_factor
     box_w = text_width + padding * 2
     box_h = text_height + padding
 
@@ -1332,16 +1338,22 @@ def convert_text(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
     ext_cy = px_to_emu(box_h)
 
     # Paragraph mode: wrap="square" so text reflows when the user resizes,
-    # but NO spAutoFit — otherwise PowerPoint expands the frame to fit a
-    # long joined-up <a:p> on one line, blowing past the canvas. The cx we
-    # write below (longest SVG line × 1.05) is the design target width;
-    # PowerPoint wraps long paragraphs inside this width.
+    # but NO spAutoFit for long paragraphs — otherwise PowerPoint expands
+    # the frame to fit a long joined-up <a:p> on one line, blowing past the
+    # canvas. For short paragraphs (≤3 lines) spAutoFit lets PowerPoint
+    # correct small height estimation errors and prevents text clipping.
     # Single-line text keeps wrap="none" + spAutoFit for tight fidelity.
     if paragraph_runs is not None:
-        body_pr_xml = (
-            '<a:bodyPr wrap="square" lIns="0" tIns="0" rIns="0" bIns="0" '
-            'anchor="t" anchorCtr="0"/>'
-        )
+        if len(paragraph_runs) <= 3:
+            body_pr_xml = (
+                '<a:bodyPr wrap="square" lIns="0" tIns="0" rIns="0" bIns="0" '
+                'anchor="t" anchorCtr="0">\n<a:spAutoFit/>\n</a:bodyPr>'
+            )
+        else:
+            body_pr_xml = (
+                '<a:bodyPr wrap="square" lIns="0" tIns="0" rIns="0" bIns="0" '
+                'anchor="t" anchorCtr="0"/>'
+            )
     else:
         body_pr_xml = (
             '<a:bodyPr wrap="none" lIns="0" tIns="0" rIns="0" bIns="0" '
