@@ -194,6 +194,11 @@ exports/*
 # MinerU temporary outputs
 tmp_mineru_output/
 tmp_mineru_probe/
+/tmp_*/
+/tmp_*.json
+/tmp_*.txt
+/temp_*
+/UTDIR*
 
 # SVG QC output
 svg_qc_output.txt
