@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import re
 import sys
 import tempfile
 import unittest
@@ -68,6 +69,18 @@ class ProjectManagerReportTests(unittest.TestCase):
             self.assertIn('"stages"', report)
             self.assertIn('"archive_markdown"', report)
             self.assertIn('"sync_formulas"', report)
+
+
+class WorkflowGuardTests(unittest.TestCase):
+    def test_pages_workflow_does_not_request_site_enablement(self) -> None:
+        workflow_path = ROOT / ".github" / "workflows" / "deploy-pages.yml"
+        workflow = workflow_path.read_text(encoding="utf-8")
+
+        self.assertIn("uses: actions/configure-pages@v4", workflow)
+        self.assertIsNone(
+            re.search(r"^\s*enablement:\s*true\s*$", workflow, flags=re.MULTILINE),
+            "configure-pages should not try to create or enable the Pages site during CI",
+        )
 
 
 @unittest.skipIf(Image is None, "Pillow is required for image fixture generation")
