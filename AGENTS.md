@@ -32,6 +32,7 @@ PPT Master is an AI-driven presentation generation system. Multi-role collaborat
 - Technical SVG/PPT constraints live in [`skills/ppt-master/references/shared-standards.md`](skills/ppt-master/references/shared-standards.md).
 - Canvas choices live in [`skills/ppt-master/references/canvas-formats.md`](skills/ppt-master/references/canvas-formats.md).
 - Icon library details live in [`skills/ppt-master/templates/icons/README.md`](skills/ppt-master/templates/icons/README.md).
+- User-provided source folders are read-only: never move, delete, empty, or clean them. Use `import-sources ... --copy`; `--move` is deprecated and ignored by the script.
 
 ## Required Conventions
 
@@ -69,7 +70,7 @@ ${PYTHON} skills/ppt-master/scripts/preflight_check.py <project_path>           
 
 # Project management
 ${PYTHON} skills/ppt-master/scripts/project_manager.py init <project_name> --format ppt169
-${PYTHON} skills/ppt-master/scripts/project_manager.py import-sources <project_path> <source_files_or_URLs...> --move
+${PYTHON} skills/ppt-master/scripts/project_manager.py import-sources <project_path> <source_files_or_URLs...> --copy
 ${PYTHON} skills/ppt-master/scripts/project_manager.py validate <project_path>
 
 # Image tools and SVG quality check

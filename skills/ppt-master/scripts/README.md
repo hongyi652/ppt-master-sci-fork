@@ -22,7 +22,7 @@ python3 scripts/source_to_md/mineru_to_md.py <file.pdf>  # only supported PDF pa
 python3 scripts/source_to_md/ppt_to_md.py <deck.pptx>
 python3 scripts/source_to_md/excel_to_md.py <workbook.xlsx>
 python3 scripts/project_manager.py init <project_name> --format ppt169
-python3 scripts/project_manager.py import-sources <project_path> <source_files...> --move
+python3 scripts/project_manager.py import-sources <project_path> <source_files...> --copy
 python3 scripts/preflight_check.py <project_path> --json
 python3 scripts/total_md_split.py <project_path>
 python3 scripts/finalize_svg.py <project_path>
@@ -39,7 +39,7 @@ python3 scripts/update_repo.py
 
 | Area | Primary scripts | Documentation |
 |------|-----------------|---------------|
-| Conversion | `source_to_md/mineru_to_md.py`, `convert_pdf.py`, `source_to_md/doc_to_md.py`, `source_to_md/excel_to_md.py`, `source_to_md/ppt_to_md.py`, `source_to_md/web_to_md.py` | [docs/conversion.md](./docs/conversion.md) |
+| Conversion | `source_to_md/mineru_to_md.py`, `convert_pdf.py`, `source_to_md/doc_to_md.py`, `source_to_md/excel_to_md.py`, `source_to_md/ppt_to_md.py`, `source_to_md/web_to_md.py`, `latex_svg_gui.py` | [docs/conversion.md](./docs/conversion.md) |
 | Project management | `project_manager.py`, `preflight_check.py`, `stabilize_image_assets.py`, `batch_validate.py`, `generate_examples_index.py`, `error_helper.py`, `pptx_template_import.py` | [docs/project.md](./docs/project.md) |
 | SVG pipeline | `finalize_svg.py`, `svg_to_pptx.py`, `total_md_split.py`, `svg_quality_checker.py`, `animation_config.py`, `notes_to_audio.py` | [docs/svg-pipeline.md](./docs/svg-pipeline.md) |
 | Spec maintenance | `update_spec.py` | [docs/update_spec.md](./docs/update_spec.md) |
@@ -58,6 +58,8 @@ python3 scripts/source_to_md/ppt_to_md.py <deck.pptx>        # local fallback fo
 python3 scripts/source_to_md/doc_to_md.py <file.docx>        # local fallback for DOCX
 python3 scripts/source_to_md/excel_to_md.py <workbook.xlsx>   # local fallback for XLSX
 python3 scripts/source_to_md/web_to_md.py <url>
+python3 scripts/latex_svg_gui.py                              # local browser GUI for one-off LaTeX to SVG
+# Windows: double-click start_latex_svg_gui.bat from the repository root
 ```
 
 Project setup:
@@ -65,7 +67,7 @@ Project setup:
 ```bash
 python3 scripts/preflight_check.py <project_path>             # pre-run environment + project sanity check
 python3 scripts/project_manager.py init <project_name> --format ppt169
-python3 scripts/project_manager.py import-sources <project_path> <source_files...> --move
+python3 scripts/project_manager.py import-sources <project_path> <source_files...> --copy
 python3 scripts/project_manager.py validate <project_path>
 python3 scripts/stabilize_image_assets.py <project_path>      # short aliases + dimension table for images
 ```

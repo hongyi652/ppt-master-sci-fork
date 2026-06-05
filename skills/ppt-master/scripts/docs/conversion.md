@@ -19,7 +19,7 @@ python3 scripts/source_to_md/mineru_to_md.py paper.pdf -o projects/demo/sources/
 python3 scripts/source_to_md/mineru_to_md.py report.docx -o projects/demo/sources/report.md
 python3 scripts/source_to_md/mineru_to_md.py paper.pdf -o projects/demo/sources/paper.md --is-ocr
 python3 scripts/source_to_md/mineru_to_md.py mineru_result.zip --from-zip -o projects/demo/sources/paper.md
-python3 scripts/project_manager.py import-sources projects/demo paper.pdf --move
+python3 scripts/project_manager.py import-sources projects/demo paper.pdf --copy
 ```
 
 Configuration:
@@ -219,3 +219,25 @@ Pipeline integration:
    then `stabilize_image_assets.py` to refresh `notes/formula_asset_table.md`
 4. Step 6 (Executor): read `notes/formula_asset_table.md`, reference `SVG href`,
    add `data-formula-id`, and respect short-formula scale guidance
+
+
+## `latex_svg_gui.py`
+
+Standalone local browser GUI for one-off LaTeX formula rendering. It reuses
+`latex_to_svg.py` internally but is not part of the PPT generation workflow.
+
+```bash
+python3 scripts/latex_svg_gui.py
+python3 scripts/latex_svg_gui.py --open --output-dir projects/demo/images
+python3 scripts/latex_svg_gui.py --check-deps
+# Windows: double-click start_latex_svg_gui.bat from the repository root
+```
+
+Behavior:
+- starts a local HTTP server on `127.0.0.1:8765` by default, trying nearby ports
+  when the preferred port is busy
+- checks whether TeX and `dvisvgm` are available and shows their status in the UI
+- renders one formula at a time in display or inline mode
+- saves SVG output to `exports/latex_svg/` by default, or to a user-selected
+  directory
+- previews the generated SVG and exposes copy/download actions

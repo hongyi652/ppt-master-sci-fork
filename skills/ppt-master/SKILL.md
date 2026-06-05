@@ -55,7 +55,7 @@ ${PYTHON} ${SKILL_DIR}/scripts/preflight_check.py <project_path>
 >      When the formula is generated ad hoc during page execution, pass `--source-file`, `--line-number`, and `--context` whenever that information is available so the SVG and `formula_manifest.json` carry the same semantic metadata as manifest-rendered formulas.
 >    - **Per-page mandatory pre-scan**: before writing each page, scan ALL planned text for formula-like tokens. For each one, call `latex_to_svg.py` to generate the SVG **before** writing the page SVG. Raw patterns without `<image>` → blocking error. **Never split a formula across multiple `<text>` elements.** `svg_quality_checker.py` detects violations as **errors**.
 >    - **⛔ FORBIDDEN — formula avoidance by text substitution**: when the quality checker flags a formula violation, the ONLY acceptable fix is to **generate an SVG image** via `latex_to_svg.py`. Replacing the formula with plain-text descriptions (e.g. `φ_burst` → "破裂填充比"), removing mathematical notation (e.g. `x/y` → "x与y"), or substituting an equation with a vague label (e.g. `P = C₁ε^C₂ / (1+C₃ε^C₄)` → "四参数 S 型曲线") is **strictly forbidden**. These workarounds destroy the scientific meaning of the slide content.
-> 11. **⛔ IRON RULE — NEVER MODIFY OR DELETE USER SOURCE FILES** — User-provided original documents (PDF, DOCX, PPTX, XLSX, etc.) MUST **never** be deleted, moved, or modified. `import-sources` always **copies** original documents into `sources/` regardless of the `--move` flag. Only generated intermediate files (Step 1 Markdown output, `_files/` companion dirs) may be moved. If the original file disappears after the workflow, that is a critical bug.
+> 11. **⛔ IRON RULE — NEVER MODIFY OR DELETE USER SOURCE FILES OR FOLDERS** — User-provided original documents, images, Markdown, data files, and source folders MUST **never** be deleted, moved, renamed, emptied, or modified. Treat every user-supplied path as read-only, including folders expanded with wildcards. `import-sources` always **copies** inputs into `sources/`; `--move` is deprecated and ignored by the script. Do NOT run `rm`, `Remove-Item`, `Move-Item`, `shutil.move`, or any cleanup command against a user-provided folder. If any original file disappears after the workflow, that is a critical bug.
 > 12. **⛔ IRON RULE — NEVER OVERWRITE EXISTING PROJECTS** — When creating a new project, if a project directory with the same name already exists, `project_manager.py init` automatically appends `_2`, `_3`, etc. Never reuse, overwrite, or continue work in an existing project directory when the user asks to create a **new** project. Each `init` call produces a fresh, independent project.
 > 13. **⛔ IRON RULE — NO IMAGE STRETCHING / DISTORTION** — When embedding source images (paper figures, screenshots, charts, diagrams, product photos) into SVG pages, the image MUST preserve its original aspect ratio. Use `preserveAspectRatio="xMidYMid meet"` (default). **`preserveAspectRatio="none"` is FORBIDDEN for all content-bearing images** — it stretches the image to fill the container, distorting charts, text, and details. If the image's native ratio does not match the allocated container, resize the container to match the image — never stretch the image to match the container. `svg_quality_checker.py` flags `preserveAspectRatio="none"` on non-background images as an **error**.
 > 14. **⛔ IRON RULE — QUALITY CHECKER ERRORS ARE BLOCKING** — When `svg_quality_checker.py` reports **errors** (not warnings), the Executor MUST fix every error before proceeding to Step 7. Errors are never "non-critical" — skipping formula violations, undersized formula SVGs, XML issues, or spec drift and proceeding to export defeats the quality gate. The ONLY acceptable response to an error is: fix the SVG, re-run the checker, confirm 0 errors. Proceeding with errors present constitutes execution failure.
@@ -164,13 +164,14 @@ After confirming the mode, proceed to Step 1.
 
 > **No source content?** When the user supplies only a topic name or requirements without any file or substantive description, run the [`topic-research`](workflows/topic-research.md) workflow first, then return here with its products as input.
 
-> **Project-bound conversion only**: when the user provides source files (PDF / DOCX / XLSX / PPTX / EPUB / HTML / URL), do **not** run a standalone converter on the original source path. Initialize the project first, then use `project_manager.py import-sources` so every derived Markdown file, `_files/` directory, zip, and conversion report stays under the target `project/` tree instead of beside the user's original document.
+> **Project-bound conversion only**: when the user provides source files or folders (PDF / DOCX / XLSX / PPTX / EPUB / HTML / images / URL), do **not** run a standalone converter on the original source path. Initialize the project first, then use `project_manager.py import-sources` with copy-only intake so every derived Markdown file, `_files/` directory, zip, and conversion report stays under the target `project/` tree instead of beside the user's original document.
 
 For source intake, use this rule:
 
 | User Provides | Step 1 action |
 |---------------|---------------|
-| PDF / DOCX / XLSX / PPTX / EPUB / HTML / LaTeX / RST / Office file | Confirm the source is present, then defer conversion to Step 2 `project_manager.py import-sources <project_path> <source_files...> --move` |
+| PDF / DOCX / XLSX / PPTX / EPUB / HTML / LaTeX / RST / Office file | Confirm the source is present, then defer conversion to Step 2 `project_manager.py import-sources <project_path> <source_files...> --copy` |
+| Folder containing source files / images | Treat the folder as read-only; enumerate the needed files and import them with `project_manager.py import-sources <project_path> <files...> --copy`. Never pass a folder to any move/delete/cleanup command |
 | Web link / WeChat / high-security site | Initialize the project first, then import the URL through Step 2 `project_manager.py import-sources <project_path> <URL>` so fetched Markdown lands inside `project/sources/` |
 | CSV / TSV | Read directly as plain-text table source, or import into the project if a persisted copy is needed |
 | Markdown | Read directly |
@@ -235,10 +236,11 @@ Import source content (choose based on the situation):
 
 | Situation | Action |
 |-----------|--------|
-| Has source files (PDF/MD/etc.) | `${PYTHON} ${SKILL_DIR}/scripts/project_manager.py import-sources <project_path> <source_files...> --move` |
+| Has source files (PDF/MD/images/etc.) | `${PYTHON} ${SKILL_DIR}/scripts/project_manager.py import-sources <project_path> <source_files...> --copy` |
+| User provided a source folder | Enumerate the needed files, then run `${PYTHON} ${SKILL_DIR}/scripts/project_manager.py import-sources <project_path> <source_files...> --copy`; the folder itself stays untouched |
 | User provided text directly in conversation | No import needed — content is already in conversation context; subsequent steps can reference it directly |
 
-> ⚠️ **Source document protection**: `import-sources` **always copies** original documents (PDF, DOCX, PPTX, XLSX, etc.) — even with `--move`. Only generated intermediate files (Step 1's Markdown output, `_files/` dirs) are moved. The user's original file is **never deleted or modified**.
+> ⚠️ **Source path protection**: `import-sources` **always copies** source files and companion asset directories. `--move` is deprecated and ignored. The user's original files and folders are **never deleted, moved, emptied, or modified**.
 >
 > ⚠️ **Intermediate output location**: use `import-sources` as the default entry point for file-based sources. It writes converted Markdown, `_files/` asset directories, and reports under the project tree. Do **not** run standalone converters on the original source path unless you also pass an explicit `-o` inside `<project_path>/sources/`.
 >

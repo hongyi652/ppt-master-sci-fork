@@ -3,7 +3,7 @@
 
 Usage:
     python3 scripts/project_manager.py init <project_name> [--format ppt169] [--dir projects]
-    python3 scripts/project_manager.py import-sources <project_path> <source1> [<source2> ...] [--move | --copy]
+    python3 scripts/project_manager.py import-sources <project_path> <source1> [<source2> ...] [--copy]
     python3 scripts/project_manager.py validate <project_path>
     python3 scripts/project_manager.py info <project_path>
 """
@@ -266,9 +266,11 @@ class ProjectManager:
 
         destination = self._ensure_unique_path(destination)
         if move:
-            shutil.move(str(source), str(destination))
-        else:
-            shutil.copy2(source, destination)
+            print(
+                f"note: --move ignored for {source}; copied to protect the source file.",
+                file=sys.stderr,
+            )
+        shutil.copy2(source, destination)
         return destination
 
     def _copy_or_move_tree(self, source: Path, destination: Path, move: bool) -> Path:
@@ -280,9 +282,11 @@ class ProjectManager:
 
         destination = self._ensure_unique_path(destination)
         if move:
-            shutil.move(str(source), str(destination))
-        else:
-            shutil.copytree(source, destination)
+            print(
+                f"note: --move ignored for directory {source}; copied to protect source folder contents.",
+                file=sys.stderr,
+            )
+        shutil.copytree(source, destination)
         return destination
 
     def _run_tool(self, args: list[str]) -> None:
@@ -674,8 +678,6 @@ class ProjectManager:
         copy: bool = False,
         pdf_parser: str = "mineru",
     ) -> dict[str, list[str]]:
-        if move and copy:
-            raise ValueError("--move and --copy are mutually exclusive")
         if pdf_parser != "mineru":
             raise ValueError("Native PDF parsing has been removed; only --pdf-parser mineru is supported")
         project_dir = Path(project_path)
@@ -692,6 +694,14 @@ class ProjectManager:
             "notes": [],
             "skipped": [],
         }
+        if move:
+            note = (
+                "--move ignored: import-sources copies all source inputs and companion "
+                "asset directories so user files and folders are never deleted or emptied."
+            )
+            print(f"note: {note}", file=sys.stderr)
+            summary["notes"].append(note)
+            move = False
         import_started_at = datetime.now()
         import_start = time.perf_counter()
         stage_report: list[dict[str, object]] = []
@@ -790,42 +800,18 @@ class ProjectManager:
                 summary["skipped"].append(f"{item}: path not found")
                 continue
             if source_path.is_dir():
-                summary["skipped"].append(f"{item}: directories are not supported")
+                summary["skipped"].append(
+                    f"{item}: directories are read-only and not imported directly; "
+                    "pass the needed files explicitly with --copy"
+                )
                 continue
 
             suffix = source_path.suffix.lower()
 
-            # ⛔ IRON RULE: user-provided original documents (PDF, DOCX,
-            # PPTX, XLSX, etc.) are ALWAYS copied, NEVER moved — regardless
-            # of --move or repo-internal auto-move.  Only intermediate /
-            # generated files (Markdown from Step 1 conversion, companion
-            # asset dirs) may be moved.
-            _ORIGINAL_DOC_SUFFIXES = (
-                PDF_SUFFIXES | PRESENTATION_SUFFIXES | EXCEL_SUFFIXES
-                | LEGACY_EXCEL_SUFFIXES | DOC_SUFFIXES
-                | {'.txt', '.csv', '.tsv'}
-            )
-            is_original_doc = suffix in _ORIGINAL_DOC_SUFFIXES
-
-            if copy or is_original_doc:
-                effective_move = False
-                if is_original_doc and move:
-                    print(
-                        f"note: {source_path.name} is an original document; "
-                        f"copied (not moved) to protect the source file.",
-                        file=sys.stderr,
-                    )
-            elif move:
-                effective_move = True
-            elif is_within_path(source_path, REPO_ROOT):
-                effective_move = True
-                print(
-                    f"note: {source_path} is inside the ppt-master repo; moved "
-                    f"(not copied) to avoid accidental commit. Pass --copy to override.",
-                    file=sys.stderr,
-                )
-            else:
-                effective_move = False
+            # ⛔ IRON RULE: import-sources treats every input path as read-only.
+            # User-provided files, source folders, wildcard-expanded folder
+            # contents, and companion asset dirs are ALWAYS copied, NEVER moved.
+            effective_move = False
 
             if suffix in {".md", ".markdown"}:
                 duplicate_markdown = self._find_equivalent_markdown(source_path, sources_dir)
@@ -1350,8 +1336,6 @@ def parse_import_args(argv: list[str]) -> tuple[str, list[str], bool, bool, str]
             sources.append(arg)
             i += 1
 
-    if move and copy:
-        raise ValueError("--move and --copy are mutually exclusive")
     if pdf_parser != "mineru":
         raise ValueError("Native PDF parsing has been removed; only --pdf-parser mineru is supported")
     if not sources:

@@ -112,7 +112,7 @@ Source documents (PDF / DOCX / EPUB / XLSX / PPTX / web pages) are normalized in
 
 ## Project Structure & Lifecycle
 
-The non-obvious bit of the project layout is `import-sources`'s **source-protection split**: user-provided original documents (`.pdf`, `.docx`, `.pptx`, `.xlsx`, etc.) are always *copied* into `sources/`, even when `--move` is passed. Generated intermediates such as Markdown files and companion `_files/` directories may be moved when the operator requests cleanup. Files already inside the repo are also moved by default unless `--copy` is passed, so temporary artifacts do not accidentally become commit candidates. The split tracks the natural risk profile — user assets are protected, generated artifacts can be cleaned up.
+The non-obvious bit of the project layout is `import-sources`'s **read-only source intake**: user-provided documents, images, Markdown files, data files, source folders, and wildcard-expanded folder contents are always *copied* into `sources/`. `--move` is accepted only for backward compatibility and is ignored. Generated companion `_files/` directories are copied as well, so no source folder is emptied by import. Cleanup is a separate, explicit user-requested action, not part of source intake.
 
 ---
 

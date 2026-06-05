@@ -69,7 +69,7 @@ ${PYTHON} skills/ppt-master/scripts/preflight_check.py <project_path>           
 
 # Project management
 ${PYTHON} skills/ppt-master/scripts/project_manager.py init <project_name> --format ppt169
-${PYTHON} skills/ppt-master/scripts/project_manager.py import-sources <project_path> <source_files_or_URLs...> --move
+${PYTHON} skills/ppt-master/scripts/project_manager.py import-sources <project_path> <source_files_or_URLs...> --copy
 ${PYTHON} skills/ppt-master/scripts/project_manager.py validate <project_path>
 
 # Image tools and SVG quality check

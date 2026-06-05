@@ -1,6 +1,6 @@
 # Project Tools
 
-> Architecture rationale (why `import-sources` defaults are asymmetric for in-repo vs out-of-repo files): see [docs/technical-design.md "Project Structure & Lifecycle"](../../../../docs/technical-design.md#project-structure--lifecycle).
+> Architecture rationale for read-only source intake: see [docs/technical-design.md "Project Structure & Lifecycle"](../../../../docs/technical-design.md#project-structure--lifecycle).
 
 Project tools create, validate, and inspect the standard PPT Master workspace.
 
@@ -16,10 +16,10 @@ python3 scripts/project_manager.py info <project_path>
 ```
 
 Notes:
-- User-provided original documents (`.pdf`, `.docx`, `.pptx`, `.xlsx`, etc.) are always copied into `sources/`, even when `--move` is passed.
-- Generated intermediates such as Markdown files and companion `_files/` directories may be moved when `--move` is passed.
-- Files already inside the repo are moved into `sources/` by default (with a stderr note), to avoid leaving unintended artifacts that could be committed by mistake. Pass `--copy` to force a copy for in-repo sources instead.
-- `--move` and `--copy` are mutually exclusive; `--move` never overrides original-document protection.
+- Source inputs are always copied into `sources/`; this includes documents, images, Markdown, data files, and wildcard-expanded folder contents.
+- Companion `_files/` directories are copied as well, so source folders are never emptied by import.
+- `--move` is accepted only for backward compatibility and is ignored.
+- Cleanup is a separate user-requested action, not part of `import-sources`.
 - `import-sources` is the preferred entry point for PDFs, Office docs, PPTX, Excel, and URLs because it keeps converted Markdown, companion `_files/` directories, and conversion reports inside the project tree instead of beside the original source file.
 
 Common formats:

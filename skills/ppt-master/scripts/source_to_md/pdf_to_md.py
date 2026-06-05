@@ -14,7 +14,7 @@ MESSAGE = """[ERROR] Native PDF parsing has been removed from PPT Master.
 Use MinerU instead:
   python3 scripts/source_to_md/mineru_to_md.py <file.pdf>
 or import through the project manager:
-  python3 scripts/project_manager.py import-sources <project_path> <file.pdf> --move
+  python3 scripts/project_manager.py import-sources <project_path> <file.pdf> --copy
 """
 
 
