@@ -62,7 +62,9 @@ ${PYTHON} ${SKILL_DIR}/scripts/preflight_check.py <project_path>
 > 15. **⛔ IRON RULE — FORMULA ERRORS MUST BE FIXED BY SVG RENDERING, NEVER BY REMOVAL** — When the quality checker flags a plain-text formula violation, the executor MUST: (1) run `latex_to_svg.py` to render the formula as SVG, (2) embed via `<image>`. **Deleting the mathematical symbol and rewording the sentence** (e.g. `v_⊥²/(v²B) 较大` → "低速粒子", `v_∥ 足够大` → "平行速度分量足够大") is a **forbidden shortcut** — it destroys scientific meaning. If the LaTeX cannot compile, fix the source expression; never remove the formula. When the checker flags a fake inline super/sub split (`m` + `-3`, `H` + `2`, etc.), the only acceptable fixes are: merge it back into **one** `<text>` with inline `baseline-shift` for the narrow Tier A case, or convert it to Tier B SVG. Never keep separate boxes and just tweak their positions.
 > 16. **⛔ IRON RULE — ONE SENTENCE = ONE `<text>` ELEMENT** — When a sentence needs mixed styling (bold, color, size for emphasis), it MUST stay in a **single `<text>` element** with `<tspan>` children for inline formatting. **Never split a sentence into multiple adjacent `<text>` elements** to apply different styles — this creates separate text frames in PowerPoint with fragile spacing that drifts on resize. Example: `<text>实现<tspan fill="#1A73E8" font-weight="bold">10倍</tspan>效率提升</text>`. `svg_quality_checker.py` detects 3+ same-line `<text>` splits as a warning.
 
-> 17. **⛔ IRON RULE — NO PAGE TRANSITIONS UNLESS THE USER EXPLICITLY ASKS** — Slide-to-slide PPT transition effects are **off by default**. Unless the user clearly asks for page transitions / 切换动画 / 过场动画, export with `-t none` (or leave `-t` unset, which defaults to `none`). Do **not** add fade/push/wipe/split transitions on your own. If the user asks for in-slide object animation but says nothing about page transitions, keep page transition at `none` and only tune object animation.
+> 17. **⛔ IRON RULE — MINERU PARSING FAILURE STOPS PPT GENERATION** — If MinerU parsing fails in `convert_pdf.py`, `mineru_to_md.py`, or `project_manager.py import-sources`, the workflow MUST stop immediately. Do NOT fall back to alternate converters, draft from partial Markdown, continue to Strategist / Executor, or export PPTX. Report exactly: `MinerU 解析失败，已停止生成 PPT。请调整网络后再重试。`
+
+> 18. **⛔ IRON RULE — NO PAGE TRANSITIONS UNLESS THE USER EXPLICITLY ASKS** — Slide-to-slide PPT transition effects are **off by default**. Unless the user clearly asks for page transitions / 切换动画 / 过场动画, export with `-t none` (or leave `-t` unset, which defaults to `none`). Do **not** add fade/push/wipe/split transitions on your own. If the user asks for in-slide object animation but says nothing about page transitions, keep page transition at `none` and only tune object animation.
 
 > [!IMPORTANT]
 > ## 🌐 Language & Communication Rule
@@ -178,6 +180,8 @@ For source intake, use this rule:
 
 > **⛔ Intermediate-file location rule**: generated Markdown, companion `_files/` directories, MinerU zip archives, conversion reports, and any other conversion intermediates must live inside the corresponding `project/` directory. Writing them beside the user's original PDF / DOCX / PPTX / XLSX file is a workflow violation.
 
+> **⛔ MinerU failure stop rule**: if MinerU parsing fails while converting any imported source, stop the PPT generation workflow immediately. Do not use local converter fallbacks or partial conversion output. Tell the user: `MinerU 解析失败，已停止生成 PPT。请调整网络后再重试。`
+
 > **Office vector assets (EMF/WMF) from DOCX/PPTX sources**:
 > `doc_to_md.py` / `ppt_to_md.py` extract embedded Office vector images (.emf/.wmf)
 > alongside bitmap images. After `import-sources`, these land in `images/`
@@ -243,6 +247,8 @@ Import source content (choose based on the situation):
 > ⚠️ **Source path protection**: `import-sources` **always copies** source files and companion asset directories. `--move` is deprecated and ignored. The user's original files and folders are **never deleted, moved, emptied, or modified**.
 >
 > ⚠️ **Intermediate output location**: use `import-sources` as the default entry point for file-based sources. It writes converted Markdown, `_files/` asset directories, and reports under the project tree. Do **not** run standalone converters on the original source path unless you also pass an explicit `-o` inside `<project_path>/sources/`.
+>
+> ⛔ **MinerU failure stop**: when `import-sources` reports a MinerU parsing failure, stop here. Do not proceed to live preview, template selection, Strategist, SVG generation, or export. Tell the user: `MinerU 解析失败，已停止生成 PPT。请调整网络后再重试。`
 >
 > ⚠️ **Project name collision**: if a project directory with the same name already exists, `init` automatically appends an incrementing suffix (`_2`, `_3`, ...) to create a **new** project. It **never overwrites or reuses** an existing project directory.
 

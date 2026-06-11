@@ -4,8 +4,8 @@ PPT Master - MinerU Document Conversion Wrapper
 
 Stable wrapper around MinerU that handles proxy/SSL setup, automatic retry,
 zip preservation, and a conversion report.  When MinerU fails after all
-retries the script prints clear fallback instructions instead of a raw
-traceback.
+retries the script stops the PPT workflow and prints the required network
+retry instruction instead of a raw traceback.
 
 MinerU (v3.1+) natively supports: PDF, DOCX, PPTX, XLSX, and images.
 This script is format-agnostic — it uploads whatever file it receives and
@@ -63,6 +63,7 @@ PROXY_ENV_KEYS = (
     "NO_PROXY", "no_proxy",
 )
 MINERU_HOST = "mineru.net"
+MINERU_FAILURE_STOP_MESSAGE = "MinerU 解析失败，已停止生成 PPT。请调整网络后再重试。"
 
 
 # ------------------------------------------------------------------
@@ -202,29 +203,22 @@ def _write_report(
     )
 
 
-def _print_fallback_instructions(error_message: str) -> None:
-    """Print clear fallback instructions when MinerU fails."""
+def _print_failure_stop_instructions(error_message: str) -> None:
+    """Print the workflow stop message when MinerU fails."""
     print("\n" + "=" * 70, file=sys.stderr)
     print("MinerU conversion failed after all retries.", file=sys.stderr)
     print(f"Error: {error_message}", file=sys.stderr)
     print("=" * 70, file=sys.stderr)
-    print("\nFallback options:", file=sys.stderr)
+    print(f"\n{MINERU_FAILURE_STOP_MESSAGE}", file=sys.stderr)
     print(
-        "  1. Manual MinerU upload:\n"
-        "     Go to https://mineru.net, upload the PDF manually,\n"
-        "     download the result zip, then run:\n"
-        "       python3 scripts/source_to_md/mineru_to_md.py result.zip --from-zip -o output.md",
-        file=sys.stderr,
-    )
-    print(
-        "  2. Check proxy / network:\n"
+        "\nNetwork checks before retrying:\n"
         "     - Ensure MINERU_API_TOKEN is set in .env\n"
         "     - If behind a corporate proxy, set HTTP_PROXY / HTTPS_PROXY\n"
         "     - The wrapper already adds mineru.net to NO_PROXY",
         file=sys.stderr,
     )
     print(
-        "  3. Retry with --retries N / --timeout N:\n"
+        "\nRetry after the network is fixed:\n"
         "       python3 scripts/convert_pdf.py paper.pdf --retries 5 --timeout 600",
         file=sys.stderr,
     )
@@ -357,7 +351,7 @@ def main(argv: list[str] | None = None) -> int:
         success = True
     except Exception as exc:
         error_message = str(exc).strip() or "unknown error"
-        _print_fallback_instructions(error_message)
+        _print_failure_stop_instructions(error_message)
 
     if not args.no_report:
         _write_report(

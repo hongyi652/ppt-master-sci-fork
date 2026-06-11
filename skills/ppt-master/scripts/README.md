@@ -54,9 +54,9 @@ Conversion:
 ```bash
 python3 scripts/convert_pdf.py <file>                        # MinerU wrapper: PDF/DOCX/PPTX/XLSX, proxy + retry + report
 python3 scripts/source_to_md/mineru_to_md.py <file>          # direct MinerU call (PDF/DOCX/PPTX/XLSX/images)
-python3 scripts/source_to_md/ppt_to_md.py <deck.pptx>        # local fallback for PPTX
-python3 scripts/source_to_md/doc_to_md.py <file.docx>        # local fallback for DOCX
-python3 scripts/source_to_md/excel_to_md.py <workbook.xlsx>   # local fallback for XLSX
+python3 scripts/source_to_md/ppt_to_md.py <deck.pptx>        # local converter for PPTX when MinerU is unavailable
+python3 scripts/source_to_md/doc_to_md.py <file.docx>        # local converter for DOCX when MinerU is unavailable
+python3 scripts/source_to_md/excel_to_md.py <workbook.xlsx>   # local converter for XLSX when MinerU is unavailable
 python3 scripts/source_to_md/web_to_md.py <url>
 python3 scripts/latex_svg_gui.py                              # local browser GUI for one-off LaTeX to SVG
 # Windows: double-click start_latex_svg_gui.bat from the repository root

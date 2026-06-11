@@ -6,7 +6,7 @@ Source conversion tools are low-level building blocks behind `project_manager.py
 
 ## MinerU parsing via `source_to_md/mineru_to_md.py`
 
-PPT Master uses MinerU as the preferred parser for **PDF, DOCX, PPTX, XLSX, and images** (MinerU v3.1+). For PDF, MinerU is the only supported path. For DOCX/PPTX/XLSX, MinerU is tried first when a token is configured; on failure, the local fallback converter is used automatically.
+PPT Master uses MinerU as the preferred parser for **PDF, DOCX, PPTX, XLSX, and images** (MinerU v3.1+). For PDF, MinerU is the only supported path. For DOCX/PPTX/XLSX, MinerU is tried first when a token is configured. If MinerU parsing fails, stop the PPT workflow and tell the user: `MinerU 解析失败，已停止生成 PPT。请调整网络后再重试。`
 
 MinerU normalizes its result zip into the project convention used throughout the repo: `<output>.md` plus a sibling `<output>_files/` directory. Extracted images are referenced from Markdown and `image_manifest.json` is written for project import.
 
@@ -33,7 +33,7 @@ MINERU_API_BASE_URL=https://mineru.net/api/v4
 ## `source_to_md/doc_to_md.py`
 
 Hybrid converter: pure-Python for the common formats, pandoc fallback for the rest.
-Serves as the local fallback for `.docx` when MinerU is unavailable or fails.
+Serves as the local converter for `.docx` when MinerU is unavailable; do not use it after a MinerU parsing failure.
 
 Native path (no external binary required):
 - `.docx` — via `mammoth`

@@ -62,6 +62,7 @@ DEFAULT_BASE_URL = "https://mineru.net/api/v4"
 TERMINAL_STATES = {"done", "failed"}
 DEFAULT_POLL_INTERVAL_SECONDS = 2.0
 DEFAULT_TIMEOUT_SECONDS = 300.0
+MINERU_FAILURE_STOP_MESSAGE = "MinerU 解析失败，已停止生成 PPT。请调整网络后再重试。"
 IMAGE_EXTENSIONS = {
     ".png",
     ".jpg",
@@ -597,6 +598,8 @@ def main(argv: list[str] | None = None) -> int:
             )
     except Exception as exc:
         print(f"[ERROR] {exc}", file=sys.stderr)
+        if input_path.is_file() and not args.from_zip and input_path.suffix.lower() != ".zip":
+            print(MINERU_FAILURE_STOP_MESSAGE, file=sys.stderr)
         return 1
 
     print(result.markdown_path)

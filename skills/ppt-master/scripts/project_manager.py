@@ -64,13 +64,25 @@ DOC_SUFFIXES = {
 }
 # MinerU (v3.1+) natively supports these Office formats in addition to PDF.
 # When the MinerU API token is configured, these formats are tried via MinerU
-# first and fall back to the local converter on failure.
+# first. A MinerU parsing failure is a workflow stop condition.
 MINERU_OFFICE_SUFFIXES = {".docx", ".pptx", ".xlsx"}
+MINERU_FAILURE_STOP_MESSAGE = "MinerU 解析失败，已停止生成 PPT。请调整网络后再重试。"
 WECHAT_HOST_KEYWORDS = ("mp.weixin.qq.com", "weixin.qq.com")
 IMAGE_ASSET_SUFFIXES = {
     ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".tif",
     ".emf", ".wmf", ".svg",
 }
+
+
+class MinerUParsingFailure(RuntimeError):
+    """Raised when MinerU parsing must stop the PPT workflow."""
+
+
+def _raise_mineru_failure(exc: Exception) -> None:
+    raise MinerUParsingFailure(
+        f"{MINERU_FAILURE_STOP_MESSAGE}\nDetails: {exc}"
+    ) from exc
+
 
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
@@ -877,7 +889,7 @@ class ProjectManager:
                         status="failed",
                         error=str(exc),
                     )
-                    summary["skipped"].append(f"{item}: PDF conversion failed ({exc})")
+                    _raise_mineru_failure(exc)
             elif suffix in PRESENTATION_SUFFIXES:
                 canonical_markdown_path = sources_dir / f"{archived_path.stem}.md"
                 if archived_path.stem in explicit_markdown_stems:
@@ -899,12 +911,7 @@ class ProjectManager:
                         try:
                             self._import_with_mineru(archived_path, markdown_path)
                         except Exception as mineru_exc:
-                            print(
-                                f"[WARN] MinerU failed for {archived_path.name}, "
-                                f"falling back to ppt_to_md.py: {mineru_exc}",
-                                file=sys.stderr,
-                            )
-                            self._import_presentation(archived_path, markdown_path)
+                            _raise_mineru_failure(mineru_exc)
                     else:
                         self._import_presentation(archived_path, markdown_path)
                     _finish_stage("convert_presentation", stage_start, detail=str(archived_path))
@@ -918,6 +925,8 @@ class ProjectManager:
                         status="failed",
                         error=str(exc),
                     )
+                    if isinstance(exc, MinerUParsingFailure):
+                        raise
                     summary["skipped"].append(f"{item}: presentation conversion failed ({exc})")
             elif suffix in EXCEL_SUFFIXES:
                 canonical_markdown_path = sources_dir / f"{archived_path.stem}.md"
@@ -940,12 +949,7 @@ class ProjectManager:
                         try:
                             self._import_with_mineru(archived_path, markdown_path)
                         except Exception as mineru_exc:
-                            print(
-                                f"[WARN] MinerU failed for {archived_path.name}, "
-                                f"falling back to excel_to_md.py: {mineru_exc}",
-                                file=sys.stderr,
-                            )
-                            self._import_excel(archived_path, markdown_path)
+                            _raise_mineru_failure(mineru_exc)
                     else:
                         self._import_excel(archived_path, markdown_path)
                     _finish_stage("convert_excel", stage_start, detail=str(archived_path))
@@ -959,6 +963,8 @@ class ProjectManager:
                         status="failed",
                         error=str(exc),
                     )
+                    if isinstance(exc, MinerUParsingFailure):
+                        raise
                     summary["skipped"].append(f"{item}: Excel conversion failed ({exc})")
             elif suffix in LEGACY_EXCEL_SUFFIXES:
                 summary["notes"].append(
@@ -990,12 +996,7 @@ class ProjectManager:
                         try:
                             self._import_with_mineru(archived_path, markdown_path)
                         except Exception as mineru_exc:
-                            print(
-                                f"[WARN] MinerU failed for {archived_path.name}, "
-                                f"falling back to doc_to_md.py: {mineru_exc}",
-                                file=sys.stderr,
-                            )
-                            self._import_doc(archived_path, markdown_path)
+                            _raise_mineru_failure(mineru_exc)
                     else:
                         self._import_doc(archived_path, markdown_path)
                     _finish_stage("convert_document", stage_start, detail=str(archived_path))
@@ -1009,6 +1010,8 @@ class ProjectManager:
                         status="failed",
                         error=str(exc),
                     )
+                    if isinstance(exc, MinerUParsingFailure):
+                        raise
                     summary["skipped"].append(f"{item}: document conversion failed ({exc})")
             elif suffix == ".txt":
                 stage_start = _begin_stage("normalize_text", str(archived_path))
